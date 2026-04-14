@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class ChatMatch {
   final String name;
   final String photoUrl;
@@ -26,6 +28,92 @@ class ChatConversation {
     this.isOnline = false,
     this.isUnread = false,
   });
+}
+
+class ChatMessage {
+  final String id;
+  final String text;
+  final bool isMe;
+  final DateTime timestamp;
+  final ChatMessage? replyTo;
+  final String? imageUrl;
+  final Uint8List? imageBytes;
+
+  ChatMessage({
+    required this.id,
+    required this.text,
+    required this.isMe,
+    required this.timestamp,
+    this.replyTo,
+    this.imageUrl,
+    this.imageBytes,
+  });
+}
+
+List<ChatMessage> generateDummyMessages(String contactName) {
+  final now = DateTime.now();
+  return [
+    ChatMessage(
+      id: '1',
+      text: 'Hey! I saw you know Flutter, that\'s awesome!',
+      isMe: false,
+      timestamp: now.subtract(const Duration(hours: 2, minutes: 30)),
+    ),
+    ChatMessage(
+      id: '2',
+      text: 'Hi! Yeah I\'ve been working with it for a while now 😊',
+      isMe: true,
+      timestamp: now.subtract(const Duration(hours: 2, minutes: 28)),
+    ),
+    ChatMessage(
+      id: '3',
+      text: 'Would you be open to teaching me some basics? I can help you with UI/UX design in return!',
+      isMe: false,
+      timestamp: now.subtract(const Duration(hours: 2, minutes: 25)),
+    ),
+    ChatMessage(
+      id: '4',
+      text: 'That sounds like a great trade! I\'ve been wanting to improve my design skills',
+      isMe: true,
+      timestamp: now.subtract(const Duration(hours: 2, minutes: 20)),
+    ),
+    ChatMessage(
+      id: '5',
+      text: 'Perfect! When are you free this week?',
+      isMe: false,
+      timestamp: now.subtract(const Duration(hours: 1, minutes: 45)),
+    ),
+    ChatMessage(
+      id: '6',
+      text: 'I\'m pretty flexible, how about Thursday evening?',
+      isMe: true,
+      timestamp: now.subtract(const Duration(hours: 1, minutes: 40)),
+    ),
+    ChatMessage(
+      id: '7',
+      text: 'Thursday works! Should we do it online or meet up at a coffee shop?',
+      isMe: false,
+      timestamp: now.subtract(const Duration(hours: 1, minutes: 30)),
+    ),
+    ChatMessage(
+      id: '8',
+      text: 'Coffee shop sounds fun, any suggestions?',
+      isMe: true,
+      timestamp: now.subtract(const Duration(hours: 1, minutes: 25)),
+    ),
+    ChatMessage(
+      id: '9',
+      text: 'There\'s a great one downtown called The Grind, they have good wifi too',
+      isMe: false,
+      timestamp: now.subtract(const Duration(minutes: 45)),
+    ),
+    ChatMessage(
+      id: '10',
+      text: 'I know that place! Let\'s do it 🔥',
+      isMe: true,
+      timestamp: now.subtract(const Duration(minutes: 40)),
+    ),
+  ];
 }
 
 const List<ChatMatch> newMatches = [
