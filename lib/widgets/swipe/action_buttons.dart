@@ -20,30 +20,33 @@ class SwipeActionButtons extends StatelessWidget {
         // Pass (X)
         _ActionButton(
           onTap: onPass,
-          size: 58,
-          color: const Color(0xFFFF4458),
+          size: 60,
+          bgColor: const Color(0xFFFF4458),
           icon: Icons.close_rounded,
-          iconSize: 30,
+          iconColor: Colors.white,
+          iconSize: 32,
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 18),
 
         // Super Pitch (star)
         _ActionButton(
           onTap: onSuperPitch,
-          size: 44,
-          color: const Color(0xFF3B9FFF),
+          size: 46,
+          bgColor: const Color(0xFF3B9FFF),
           icon: Icons.star_rounded,
-          iconSize: 22,
+          iconColor: Colors.white,
+          iconSize: 24,
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 18),
 
         // Like (heart)
         _ActionButton(
           onTap: onLike,
-          size: 58,
-          color: const Color(0xFF2DDB6E),
+          size: 60,
+          bgColor: const Color(0xFF2DDB6E),
           icon: Icons.favorite_rounded,
-          iconSize: 30,
+          iconColor: Colors.white,
+          iconSize: 32,
         ),
       ],
     );
@@ -53,15 +56,17 @@ class SwipeActionButtons extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final double size;
-  final Color color;
+  final Color bgColor;
   final IconData icon;
+  final Color iconColor;
   final double iconSize;
 
   const _ActionButton({
     required this.onTap,
     required this.size,
-    required this.color,
+    required this.bgColor,
     required this.icon,
+    required this.iconColor,
     required this.iconSize,
   });
 
@@ -74,13 +79,16 @@ class _ActionButton extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.transparent,
-          border: Border.all(
-            color: color.withValues(alpha: 0.6),
-            width: 2,
-          ),
+          color: bgColor,
+          boxShadow: [
+            BoxShadow(
+              color: bgColor.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: Icon(icon, color: color, size: iconSize),
+        child: Icon(icon, color: iconColor, size: iconSize),
       ),
     );
   }

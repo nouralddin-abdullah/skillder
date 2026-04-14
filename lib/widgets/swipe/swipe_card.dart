@@ -29,8 +29,8 @@ class _SwipeCardState extends State<SwipeCard> {
   final PageController _photoController = PageController();
   int _currentPhoto = 0;
 
-  // Bottom black zone height for buttons
-  static const double _buttonZoneHeight = 130;
+  // Bottom black zone height for buttons (15% ratio)
+  static const double _buttonZoneHeight = 100;
 
   @override
   void dispose() {
@@ -126,7 +126,7 @@ class _SwipeCardState extends State<SwipeCard> {
         color: Colors.black,
         borderRadius: BorderRadius.vertical(
           top: Radius.zero,
-          bottom: Radius.circular(24),
+          bottom: Radius.circular(16),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -285,16 +285,19 @@ class _SwipeCardState extends State<SwipeCard> {
                     GestureDetector(
                       onTap: _openFullProfile,
                       child: Container(
-                        width: 34,
-                        height: 34,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.15),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            width: 1.5,
+                          ),
                         ),
                         child: const Icon(
-                          Icons.keyboard_arrow_up_rounded,
+                          Icons.arrow_upward_rounded,
                           color: Colors.white,
-                          size: 24,
+                          size: 16,
                         ),
                       ),
                     ),

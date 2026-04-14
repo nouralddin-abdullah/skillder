@@ -16,16 +16,22 @@ class SkillMatchChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         gradient: isMatch ? AppColors.primaryGradient : null,
-        color: isMatch ? null : const Color(0xFF3A3A3C),
+        color: isMatch ? null : Colors.transparent,
         borderRadius: BorderRadius.circular(100),
+        border: isMatch
+            ? null
+            : Border.all(
+                color: Colors.white.withValues(alpha: 0.5),
+                width: 1,
+              ),
       ),
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: FontWeight.w500,
           color: Colors.white,
         ),

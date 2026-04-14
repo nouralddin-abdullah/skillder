@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_colors.dart';
+import 'chat_screen.dart';
 import 'swipe_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -17,6 +18,12 @@ class _HomeShellState extends State<HomeShell> {
 
   bool get _isDarkMode => _currentIndex == 0;
 
+  Color get _navBg => _isDarkMode ? Colors.black : Colors.white;
+  Color get _navActive =>
+      _isDarkMode ? Colors.white : AppColors.textPrimary;
+  Color get _navInactive =>
+      _isDarkMode ? Colors.white38 : AppColors.textHint;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,12 +34,13 @@ class _HomeShellState extends State<HomeShell> {
           const SwipeScreen(),
           _placeholder('Explore'),
           _placeholder('Likes'),
-          _placeholder('Chat'),
+          const ChatScreen(),
           _placeholder('Profile'),
         ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: _navBg,
           border: Border(
             top: BorderSide(
               color: _isDarkMode
@@ -51,9 +59,9 @@ class _HomeShellState extends State<HomeShell> {
             currentIndex: _currentIndex,
             onTap: (index) => setState(() => _currentIndex = index),
             type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.black,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white38,
+            backgroundColor: _navBg,
+            selectedItemColor: _navActive,
+            unselectedItemColor: _navInactive,
             selectedFontSize: 10,
             unselectedFontSize: 10,
             showSelectedLabels: true,
@@ -68,11 +76,14 @@ class _HomeShellState extends State<HomeShell> {
             ),
             elevation: 0,
             items: [
-              const BottomNavigationBarItem(
+              BottomNavigationBarItem(
                 icon: Padding(
-                  padding: EdgeInsets.only(bottom: 3),
-                  child:
-                      Icon(Icons.local_fire_department_rounded, size: 26),
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Icon(
+                    Icons.local_fire_department_rounded,
+                    size: 26,
+                    color: _currentIndex == 0 ? _navActive : _navInactive,
+                  ),
                 ),
                 label: 'Swipe',
               ),
@@ -84,7 +95,7 @@ class _HomeShellState extends State<HomeShell> {
                     width: 24,
                     height: 24,
                     colorFilter: ColorFilter.mode(
-                      _currentIndex == 1 ? Colors.white : Colors.white38,
+                      _currentIndex == 1 ? _navActive : _navInactive,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -99,7 +110,7 @@ class _HomeShellState extends State<HomeShell> {
                     width: 24,
                     height: 24,
                     colorFilter: ColorFilter.mode(
-                      _currentIndex == 2 ? Colors.white : Colors.white38,
+                      _currentIndex == 2 ? _navActive : _navInactive,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -114,7 +125,7 @@ class _HomeShellState extends State<HomeShell> {
                     width: 24,
                     height: 24,
                     colorFilter: ColorFilter.mode(
-                      _currentIndex == 3 ? Colors.white : Colors.white38,
+                      _currentIndex == 3 ? _navActive : _navInactive,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -129,7 +140,7 @@ class _HomeShellState extends State<HomeShell> {
                     width: 24,
                     height: 24,
                     colorFilter: ColorFilter.mode(
-                      _currentIndex == 4 ? Colors.white : Colors.white38,
+                      _currentIndex == 4 ? _navActive : _navInactive,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -145,14 +156,14 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _placeholder(String title) {
     return Container(
-      color: _isDarkMode ? Colors.black : Colors.white,
+      color: Colors.white,
       child: Center(
         child: Text(
           title,
           style: GoogleFonts.inter(
             fontSize: 24,
             fontWeight: FontWeight.w600,
-            color: _isDarkMode ? Colors.white38 : AppColors.textSecondary,
+            color: AppColors.textSecondary,
           ),
         ),
       ),

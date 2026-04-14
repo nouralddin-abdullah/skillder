@@ -13,18 +13,18 @@ class PhotoIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: List.generate(count, (index) {
           return Expanded(
             child: Container(
-              height: 3,
-              margin: EdgeInsets.only(right: index < count - 1 ? 4 : 0),
+              height: 2,
+              margin: EdgeInsets.only(right: index < count - 1 ? 3 : 0),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(1),
                 color: index == current
                     ? Colors.white
-                    : Colors.white.withValues(alpha: 0.4),
+                    : Colors.white.withValues(alpha: 0.35),
               ),
             ),
           );
