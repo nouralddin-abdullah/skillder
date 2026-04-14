@@ -5,6 +5,7 @@ import '../../widgets/auth/custom_text_field.dart';
 import '../../widgets/auth/divider_with_text.dart';
 import '../../widgets/auth/primary_button.dart';
 import '../../widgets/auth/social_button.dart';
+import '../onboarding/onboarding_screen.dart';
 
 class SignupScreen extends StatelessWidget {
   const SignupScreen({super.key});
@@ -96,6 +97,12 @@ class SignupScreen extends StatelessWidget {
                       text: 'Create Account',
                       onPressed: () {
                         print('Sign up button pressed');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const OnboardingScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 28),
