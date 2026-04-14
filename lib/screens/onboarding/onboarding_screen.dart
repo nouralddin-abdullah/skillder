@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_colors.dart';
 import '../../widgets/onboarding/onboarding_progress.dart';
+import '../home/home_shell.dart';
 import 'steps/identity_step.dart';
 import 'steps/intent_step.dart';
 import 'steps/skills_step.dart';
@@ -52,40 +53,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       setState(() => _currentStep++);
     } else {
-      // Onboarding complete
-      print('Onboarding complete!');
-      print('Headline: ${_headlineController.text}');
-      print('Give skills: $_giveSkills');
-      print('Get skills: $_getSkills');
-      print('Intents: $_selectedIntents');
-
-      // Show completion dialog
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text('🎉'),
-          content: Text(
-            "You're all set! Your profile is ready.",
-            style: GoogleFonts.inter(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(
-                'Got it',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+      // Onboarding complete — navigate to home
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+        (route) => false,
       );
     }
   }

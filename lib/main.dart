@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/auth/login_screen.dart';
+import 'screens/home/home_shell.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -16,7 +16,7 @@ class SkillderApp extends StatelessWidget {
       title: 'Skillder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const LoginScreen(),
+      home: const HomeShell(),
     );
   }
 }
