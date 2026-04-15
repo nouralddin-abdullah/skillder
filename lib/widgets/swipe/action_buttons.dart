@@ -5,11 +5,20 @@ class SwipeActionButtons extends StatelessWidget {
   final VoidCallback onSuperPitch;
   final VoidCallback onLike;
 
+  /// 0..1 — how much the user is dragging toward each direction.
+  /// Used to animate the matching button into its "active" gradient state.
+  final double passProgress;
+  final double superProgress;
+  final double likeProgress;
+
   const SwipeActionButtons({
     super.key,
     required this.onPass,
     required this.onSuperPitch,
     required this.onLike,
+    this.passProgress = 0,
+    this.superProgress = 0,
+    this.likeProgress = 0,
   });
 
   @override
@@ -17,36 +26,48 @@ class SwipeActionButtons extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Pass (X)
         _ActionButton(
           onTap: onPass,
           size: 60,
-          bgColor: const Color(0xFFFF4458),
           icon: Icons.close_rounded,
-          iconColor: Colors.white,
+          iconColor: const Color(0xFFFF3B7D),
           iconSize: 32,
+          activeGradient: const LinearGradient(
+            colors: [Color(0xFFFF3B7D), Color(0xFFBE3BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          progress: passProgress,
         ),
         const SizedBox(width: 18),
 
-        // Super Pitch (star)
         _ActionButton(
           onTap: onSuperPitch,
           size: 46,
-          bgColor: const Color(0xFF3B9FFF),
           icon: Icons.star_rounded,
-          iconColor: Colors.white,
+          iconColor: const Color(0xFF3BAFFF),
           iconSize: 24,
+          activeGradient: const LinearGradient(
+            colors: [Color(0xFF3BAFFF), Color(0xFF1D6BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          progress: superProgress,
         ),
         const SizedBox(width: 18),
 
-        // Like (heart)
         _ActionButton(
           onTap: onLike,
           size: 60,
-          bgColor: const Color(0xFF2DDB6E),
           icon: Icons.favorite_rounded,
-          iconColor: Colors.white,
+          iconColor: const Color(0xFF5BE26B),
           iconSize: 32,
+          activeGradient: const LinearGradient(
+            colors: [Color(0xFFBEE25B), Color(0xFF2DDB6E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          progress: likeProgress,
         ),
       ],
     );
@@ -56,22 +77,31 @@ class SwipeActionButtons extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final double size;
-  final Color bgColor;
   final IconData icon;
   final Color iconColor;
   final double iconSize;
+  final LinearGradient activeGradient;
+  final double progress; // 0..1
 
   const _ActionButton({
     required this.onTap,
     required this.size,
-    required this.bgColor,
     required this.icon,
     required this.iconColor,
     required this.iconSize,
+    required this.activeGradient,
+    required this.progress,
   });
 
   @override
   Widget build(BuildContext context) {
+    final t = progress.clamp(0.0, 1.0);
+
+    // Idle look: dark charcoal fill + soft outline, colored icon.
+    // Active look: gradient fill, white icon.
+    final idleColor = const Color(0xFF1E1E1E);
+    final borderColor = Colors.white.withValues(alpha: 0.08);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -79,16 +109,26 @@ class _ActionButton extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: bgColor,
-          boxShadow: [
-            BoxShadow(
-              color: bgColor.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: t < 1 ? idleColor : null,
+          gradient: t > 0 ? activeGradient : null,
+          border: Border.all(color: borderColor, width: 1),
+          boxShadow: t > 0.1
+              ? [
+                  BoxShadow(
+                    color: activeGradient.colors.last
+                        .withValues(alpha: 0.35 * t),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        child: Icon(icon, color: iconColor, size: iconSize),
+        child: Icon(
+          icon,
+          // Snap to white as soon as any drag toward this button begins.
+          color: t > 0.02 ? Colors.white : iconColor,
+          size: iconSize,
+        ),
       ),
     );
   }

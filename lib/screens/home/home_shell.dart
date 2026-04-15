@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_colors.dart';
 import 'chat_screen.dart';
+import 'explore_screen.dart';
+import 'profile_screen.dart';
 import 'swipe_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -32,10 +34,10 @@ class _HomeShellState extends State<HomeShell> {
         index: _currentIndex,
         children: [
           const SwipeScreen(),
-          _placeholder('Explore'),
+          const ExploreScreen(),
           _placeholder('Likes'),
           const ChatScreen(),
-          _placeholder('Profile'),
+          const ProfileTabScreen(),
         ],
       ),
       bottomNavigationBar: Container(

@@ -13,12 +13,18 @@ class SwipeCard extends StatefulWidget {
   final VoidCallback onSuperPitch;
   final VoidCallback onLike;
 
+  /// Signed percentages from the card swiper (-100..100).
+  final int percentX;
+  final int percentY;
+
   const SwipeCard({
     super.key,
     required this.user,
     required this.onPass,
     required this.onSuperPitch,
     required this.onLike,
+    this.percentX = 0,
+    this.percentY = 0,
   });
 
   @override
@@ -31,6 +37,17 @@ class _SwipeCardState extends State<SwipeCard> {
 
   // Bottom black zone height for buttons (15% ratio)
   static const double _buttonZoneHeight = 100;
+
+  @override
+  void didUpdateWidget(covariant SwipeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.firstName != widget.user.firstName) {
+      _currentPhoto = 0;
+      if (_photoController.hasClients) {
+        _photoController.jumpToPage(0);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -122,6 +139,21 @@ class _SwipeCardState extends State<SwipeCard> {
       ],
     );
   }
+
+  // Only the dominant axis reacts — the other direction stays at 0
+  // so you don't get two stickers/buttons lighting up on diagonal drags.
+  bool get _isHorizontalDominant =>
+      widget.percentX.abs() >= widget.percentY.abs();
+
+  double get _likeProgress => (_isHorizontalDominant && widget.percentX > 0)
+      ? (widget.percentX / 100).clamp(0.0, 1.0)
+      : 0;
+  double get _passProgress => (_isHorizontalDominant && widget.percentX < 0)
+      ? (-widget.percentX / 100).clamp(0.0, 1.0)
+      : 0;
+  double get _superProgress => (!_isHorizontalDominant && widget.percentY < 0)
+      ? (-widget.percentY / 100).clamp(0.0, 1.0)
+      : 0;
 
   @override
   Widget build(BuildContext context) {
@@ -288,21 +320,10 @@ class _SwipeCardState extends State<SwipeCard> {
                     ),
                     GestureDetector(
                       onTap: _openFullProfile,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_upward_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
+                      child: const Icon(
+                        Icons.arrow_circle_up_rounded,
+                        color: Colors.white,
+                        size: 32,
                       ),
                     ),
                   ],
@@ -353,6 +374,82 @@ class _SwipeCardState extends State<SwipeCard> {
               onPass: widget.onPass,
               onSuperPitch: widget.onSuperPitch,
               onLike: widget.onLike,
+              passProgress: _passProgress,
+              superProgress: _superProgress,
+              likeProgress: _likeProgress,
+            ),
+          ),
+
+          // ── Swipe stickers (heart / X / star) ──
+          Positioned.fill(
+            bottom: _buttonZoneHeight,
+            child: IgnorePointer(
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 28,
+                    left: 24,
+                    child: Opacity(
+                      opacity: _likeProgress,
+                      child: Transform.rotate(
+                        angle: -0.32,
+                        child: const Icon(
+                          Icons.favorite_rounded,
+                          color: Color(0xFF2DDB6E),
+                          size: 110,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 18,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 28,
+                    right: 24,
+                    child: Opacity(
+                      opacity: _passProgress,
+                      child: Transform.rotate(
+                        angle: 0.32,
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFFFF3B7D),
+                          size: 110,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 18,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: const Alignment(0, -0.25),
+                    child: Opacity(
+                      opacity: _superProgress,
+                      child: const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFF3BAFFF),
+                        size: 110,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            blurRadius: 18,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

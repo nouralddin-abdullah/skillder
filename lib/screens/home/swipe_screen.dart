@@ -32,16 +32,17 @@ class _SwipeScreenState extends State<SwipeScreen> {
         backCardOffset: const Offset(0, -12),
         padding: EdgeInsets.zero,
         isLoop: true,
-        allowedSwipeDirection: AllowedSwipeDirection.symmetric(
-          horizontal: true,
-          vertical: false,
-        ),
+        threshold: 100,
+        allowedSwipeDirection: const AllowedSwipeDirection.all(),
         onSwipe: (previousIndex, currentIndex, direction) {
+          if (direction == CardSwiperDirection.bottom) return false;
           final user = dummyUsers[previousIndex];
           if (direction == CardSwiperDirection.right) {
             print('Liked ${user.firstName}');
           } else if (direction == CardSwiperDirection.left) {
             print('Passed ${user.firstName}');
+          } else if (direction == CardSwiperDirection.top) {
+            print('Super-pitched ${user.firstName}');
           }
           return true;
         },
@@ -49,6 +50,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
             (context, index, percentThresholdX, percentThresholdY) {
           return SwipeCard(
             user: dummyUsers[index],
+            percentX: percentThresholdX,
+            percentY: percentThresholdY,
             onPass: () =>
                 _swiperController.swipe(CardSwiperDirection.left),
             onSuperPitch: () =>
