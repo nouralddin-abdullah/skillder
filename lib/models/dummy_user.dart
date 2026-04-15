@@ -34,6 +34,16 @@ const Set<String> currentUserGetSkills = {
   'Spanish',
 };
 
+DummyUser? findUserByName(String name) {
+  try {
+    return dummyUsers.firstWhere(
+      (u) => u.firstName.toLowerCase() == name.toLowerCase(),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
 const List<DummyUser> dummyUsers = [
   DummyUser(
     firstName: 'Sarah',
@@ -135,5 +145,23 @@ const List<DummyUser> dummyUsers = [
     giveSkills: ['Data Science', 'Python', 'Yoga', 'Meditation'],
     getSkills: ['Piano', 'Spanish', 'Graphic Design'],
     intent: 'Co-Learning',
+  ),
+  DummyUser(
+    firstName: 'Lina',
+    age: 25,
+    headline: 'Product Designer & Illustrator',
+    bio:
+        'Pixel-pusher turned illustrator. I spend my days designing mobile apps '
+        'and my nights drawing on my iPad. Looking to trade design tips for code.',
+    location: 'Barcelona, Spain',
+    languages: ['Spanish', 'English', 'Catalan'],
+    photos: [
+      'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800',
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800',
+      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800',
+    ],
+    giveSkills: ['UI/UX Design', 'Illustration', 'Procreate', 'Figma'],
+    getSkills: ['Flutter', 'Swift', 'JavaScript'],
+    intent: 'Skill Swap',
   ),
 ];

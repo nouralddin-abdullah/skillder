@@ -48,13 +48,17 @@ class _SwipeCardState extends State<SwipeCard> {
   }
 
   void _openFullProfile() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.9,
-        child: ProfileBottomSheet(user: widget.user),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ProfileScreen(
+          user: widget.user,
+          mode: ProfileViewMode.swipe,
+          onPass: widget.onPass,
+          onSuperPitch: widget.onSuperPitch,
+          onLike: widget.onLike,
+        ),
       ),
     );
   }

@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/dummy_chat.dart';
+import '../../models/dummy_user.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/swipe/profile_bottom_sheet.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String contactName;
@@ -104,6 +106,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     setState(() {
       _replyingTo = message;
     });
+  }
+
+  void _openContactProfile() {
+    final user = findUserByName(widget.contactName);
+    if (user == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ProfileScreen(
+          user: user,
+          mode: ProfileViewMode.chat,
+        ),
+      ),
+    );
   }
 
   void _openSafetyToolkit() {
@@ -481,45 +498,55 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     size: 22,
                   ),
                 ),
-                ClipOval(
-                  child: Image.network(
-                    widget.contactPhotoUrl,
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 40,
-                      height: 40,
-                      color: AppColors.inputFill,
-                      child: const Icon(Icons.person_rounded,
-                          color: AppColors.textHint, size: 22),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.contactName,
-                        style: GoogleFonts.inter(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      if (widget.isOnline)
-                        Text(
-                          'Online',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF2DDB6E),
-                            fontWeight: FontWeight.w500,
+                  child: GestureDetector(
+                    onTap: _openContactProfile,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        ClipOval(
+                          child: Image.network(
+                            widget.contactPhotoUrl,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              width: 40,
+                              height: 40,
+                              color: AppColors.inputFill,
+                              child: const Icon(Icons.person_rounded,
+                                  color: AppColors.textHint, size: 22),
+                            ),
                           ),
                         ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.contactName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              if (widget.isOnline)
+                                Text(
+                                  'Online',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF2DDB6E),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
