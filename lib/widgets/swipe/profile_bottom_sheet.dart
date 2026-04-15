@@ -101,16 +101,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: AppColors.textPrimary,
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.textPrimary.withValues(alpha: 0.7),
+                            width: 1.5,
+                          ),
                         ),
                         child: const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white,
-                          size: 22,
+                          Icons.arrow_downward_rounded,
+                          color: AppColors.textPrimary,
+                          size: 18,
                         ),
                       ),
                     ),
