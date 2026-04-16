@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_colors.dart';
+import '../profile/edit_profile_screen.dart';
 
 class ProfileTabScreen extends StatelessWidget {
   const ProfileTabScreen({super.key});
@@ -226,7 +227,13 @@ class _ActionRow extends StatelessWidget {
               ),
               redDot: true,
             ),
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EditProfileScreen(),
+                ),
+              );
+            },
           ),
           ),
           _ActionItem(
