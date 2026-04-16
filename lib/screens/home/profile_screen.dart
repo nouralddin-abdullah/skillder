@@ -20,55 +20,59 @@ class ProfileTabScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            // ── White top block with curved bottom ──
-            ClipPath(
-              clipper: _BottomCurveClipper(),
-              child: Container(
-                color: Colors.white,
-                padding: const EdgeInsets.only(
-                  top: 56,
-                  bottom: _headerCurveHeight + 40,
-                ),
-                child: Column(
-                  children: [
-                    const _AvatarWithProgress(
-                      imageUrl:
-                          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-                      progress: 0.20,
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Luna, 23',
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+              // ── White top block with curved bottom ──
+              ClipPath(
+                clipper: _BottomCurveClipper(),
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.only(
+                    top: 56,
+                    bottom: _headerCurveHeight + 40,
+                  ),
+                  child: Column(
+                    children: [
+                      const _AvatarWithProgress(
+                        imageUrl:
+                            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+                        progress: 0.20,
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Luna, 23',
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.verified_rounded,
-                          size: 20,
-                          color: Colors.grey.shade400,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-                    const _ActionRow(),
-                  ],
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.verified_rounded,
+                            size: 20,
+                            color: Colors.grey.shade400,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+                      const _ActionRow(),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            // ── Gray section below with Platinum placeholder cards ──
-            const SizedBox(height: 72),
-            _PlatinumCarousel(),
-            const SizedBox(height: 32),
-          ],
-        ),
+              // ── Profile Completion Section ──
+              const SizedBox(height: 40),
+              const _ProfileCompletionSection(),
+
+              // ── Gray section below with Platinum placeholder cards ──
+              const SizedBox(height: 72),
+              _PlatinumCarousel(),
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
@@ -218,23 +222,23 @@ class _ActionRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 36),
             child: _ActionItem(
-            label: 'Edit profile',
-            child: _OutlinedCircleIcon(
-              icon: Icon(
-                Icons.mode_edit_rounded,
-                size: 26,
-                color: AppColors.textPrimary,
-              ),
-              redDot: true,
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const EditProfileScreen(),
+              label: 'Edit profile',
+              child: _OutlinedCircleIcon(
+                icon: Icon(
+                  Icons.mode_edit_rounded,
+                  size: 26,
+                  color: AppColors.textPrimary,
                 ),
-              );
-            },
-          ),
+                redDot: true,
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const EditProfileScreen(),
+                  ),
+                );
+              },
+            ),
           ),
           _ActionItem(
             label: 'Add media',
@@ -405,6 +409,176 @@ class _BottomCurveClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// ─────────────────────────── Profile Completion ───────────────────────────
+
+class _ProfileCompletionSection extends StatelessWidget {
+  const _ProfileCompletionSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Text(
+              'Complete your profile to be seen by more people!',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _CompletionCard(
+            iconPath: 'assets/images/complete-profile/image.png',
+            bonus: '+28%',
+            title: 'Add at least 4 photos',
+            subtitle: 'Get up to 2x more Likes with 6 pics.',
+          ),
+          const SizedBox(height: 12),
+          _CompletionCard(
+            iconPath: 'assets/images/complete-profile/pen.png',
+            bonus: '+20%',
+            title: 'Add "About Me"',
+            subtitle: 'Get up to 25% more matches with an intro.',
+          ),
+          const SizedBox(height: 12),
+          _CompletionCard(
+            iconPath: 'assets/images/complete-profile/quotes.png',
+            bonus: '+10%',
+            title: 'Add a prompt',
+            subtitle: 'Show off your personality to spark better conversations.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompletionCard extends StatelessWidget {
+  final String iconPath;
+  final String bonus;
+  final String title;
+  final String subtitle;
+
+  const _CompletionCard({
+    required this.iconPath,
+    required this.bonus,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Icon and Bonus
+          SizedBox(
+            width: 56,
+            height: 60,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                Image.asset(iconPath, width: 54, height: 54),
+                Positioned(
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      bonus,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Text content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Circular indicator
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE5E5EA),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────── Platinum placeholder ───────────────────────────

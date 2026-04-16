@@ -75,7 +75,7 @@ class _SafetyTipsDialogState extends State<SafetyTipsDialog> {
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -127,7 +127,7 @@ class _SafetyTipsDialogState extends State<SafetyTipsDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           height: 1.4,
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -147,7 +147,7 @@ class _SafetyTipsDialogState extends State<SafetyTipsDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           height: 1.4,
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -168,7 +168,7 @@ class _SafetyTipsDialogState extends State<SafetyTipsDialog> {
                     shape: BoxShape.circle,
                     color: _currentPage == index
                         ? Colors.black
-                        : Colors.grey.withOpacity(0.4),
+                        : Colors.grey.withValues(alpha: 0.4),
                   ),
                 );
               }),

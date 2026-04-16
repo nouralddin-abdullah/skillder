@@ -29,6 +29,7 @@ flutter:
     - assets/svgs/
     - assets/images/explore/
     - assets/images/safety-widget/
+    - assets/images/complete-profile/
     - assets/branding/
 
 flutter_launcher_icons:
