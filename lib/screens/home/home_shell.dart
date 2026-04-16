@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../theme/app_colors.dart';
+import '../../widgets/chat/safety_tips_dialog.dart';
 import 'chat_screen.dart';
 import 'explore_screen.dart';
 import 'profile_screen.dart';
@@ -17,6 +19,30 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
+
+  void _onNavTap(int index) {
+    setState(() => _currentIndex = index);
+
+    if (index == 3) {
+      _checkAndShowSafetyTips();
+    }
+  }
+
+  Future<void> _checkAndShowSafetyTips() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasShown = prefs.getBool('has_shown_safety_tips') ?? false;
+
+    if (!hasShown) {
+      await prefs.setBool('has_shown_safety_tips', true);
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const SafetyTipsDialog(),
+      );
+    }
+  }
 
   bool get _isDarkMode => _currentIndex == 0;
 
@@ -59,7 +85,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
           child: BottomNavigationBar(
             currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
+            onTap: _onNavTap,
             type: BottomNavigationBarType.fixed,
             backgroundColor: _navBg,
             selectedItemColor: _navActive,

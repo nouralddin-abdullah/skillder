@@ -13,6 +13,7 @@ dependencies:
   flutter_svg: ^2.2.4
   google_fonts: ^6.2.1
   image_picker: ^1.2.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -27,6 +28,7 @@ flutter:
     - assets/icons/
     - assets/svgs/
     - assets/images/explore/
+    - assets/images/safety-widget/
     - assets/branding/
 
 flutter_launcher_icons:

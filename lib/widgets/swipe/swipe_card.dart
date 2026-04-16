@@ -159,10 +159,10 @@ class _SwipeCardState extends State<SwipeCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.black,
+        color: Color(0xFF111418),
         borderRadius: BorderRadius.vertical(
           top: Radius.zero,
-          bottom: Radius.circular(16),
+          bottom: Radius.circular(40),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -229,10 +229,10 @@ class _SwipeCardState extends State<SwipeCard> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.05),
-                      Colors.black.withValues(alpha: 0.3),
-                      Colors.black.withValues(alpha: 0.7),
-                      Colors.black,
+                      const Color(0xFF111418).withValues(alpha: 0.05),
+                      const Color(0xFF111418).withValues(alpha: 0.3),
+                      const Color(0xFF111418).withValues(alpha: 0.7),
+                      const Color(0xFF111418),
                     ],
                     stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
                   ),

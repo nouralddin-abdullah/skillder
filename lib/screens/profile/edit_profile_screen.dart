@@ -341,7 +341,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Text(
                     'Media',
                     style: GoogleFonts.inter(
-                      fontSize: 22,
+                      fontSize: 17,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
@@ -351,7 +351,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     'Add up to 9 photos. Use prompts to share your '
                     'personality, workspace or projects.',
                     style: GoogleFonts.inter(
-                      fontSize: 14,
+                      fontSize: 13,
                       height: 1.35,
                       color: AppColors.textSecondary,
                     ),
@@ -766,7 +766,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _sectionTitle(String text) => Text(
         text,
         style: GoogleFonts.inter(
-          fontSize: 20,
+          fontSize: 17,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
         ),

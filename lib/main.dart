@@ -17,7 +17,7 @@ class SkillderApp extends StatelessWidget {
       title: 'Skillder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const LoginScreen(),
+      home: const HomeShell(),
     );
   }
 }

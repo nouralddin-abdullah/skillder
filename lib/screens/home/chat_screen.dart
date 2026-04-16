@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/dummy_chat.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/chat/safety_bottom_sheet.dart';
+import '../../widgets/chat/safety_tips_dialog.dart';
 import 'chat_detail_screen.dart';
 
 class ChatScreen extends StatefulWidget {
