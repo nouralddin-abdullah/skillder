@@ -20,7 +20,9 @@ const Map<String, ({String emoji, String label})> _intentMeta = {
 };
 
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+  final String? scrollTo;
+  final ({String prompt, String answer})? initialPrompt;
+  const EditProfileScreen({super.key, this.scrollTo, this.initialPrompt});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -47,6 +49,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   final List<_Photo?> _photos = List<_Photo?>.filled(9, null, growable: false);
   final ImagePicker _picker = ImagePicker();
+  final GlobalKey _aboutMeKey = GlobalKey();
+  final GlobalKey _promptsKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
 
   static const int _maxAboutChars = 500;
   static const int _maxPrompts = 3;
@@ -220,11 +225,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400',
     );
     _aboutController.addListener(() => setState(() {}));
+
+    if (widget.initialPrompt != null) {
+      _prompts.add(_PromptEntry(
+        prompt: widget.initialPrompt!.prompt,
+        answer: widget.initialPrompt!.answer,
+      ));
+    }
+
+    if (widget.scrollTo == 'aboutMe' || widget.scrollTo == 'prompts') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final key = widget.scrollTo == 'aboutMe' ? _aboutMeKey : _promptsKey;
+        final ctx = key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: Duration.zero);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _aboutController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -442,6 +465,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final count = _aboutController.text.characters.length;
     final remaining = _maxAboutChars - count;
     return Column(
+      key: _aboutMeKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('About Me'),
@@ -513,6 +537,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ── Prompts ──
   Widget _buildPromptsSection() {
     return Column(
+      key: _promptsKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Prompts'),

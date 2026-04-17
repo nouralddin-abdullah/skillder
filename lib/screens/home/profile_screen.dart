@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'dart:math' as math;
+
 import '../../theme/app_colors.dart';
+import '../profile/answer_prompt_screen.dart';
 import '../profile/edit_profile_screen.dart';
+import '../profile/select_prompt_screen.dart';
 
 class ProfileTabScreen extends StatelessWidget {
   const ProfileTabScreen({super.key});
@@ -439,6 +443,9 @@ class _ProfileCompletionSection extends StatelessWidget {
             bonus: '+28%',
             title: 'Add at least 4 photos',
             subtitle: 'Get up to 2x more Likes with 6 pics.',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+            ),
           ),
           const SizedBox(height: 12),
           _CompletionCard(
@@ -446,6 +453,11 @@ class _ProfileCompletionSection extends StatelessWidget {
             bonus: '+20%',
             title: 'Add "About Me"',
             subtitle: 'Get up to 25% more matches with an intro.',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EditProfileScreen(scrollTo: 'aboutMe'),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           _CompletionCard(
@@ -453,6 +465,29 @@ class _ProfileCompletionSection extends StatelessWidget {
             bonus: '+10%',
             title: 'Add a prompt',
             subtitle: 'Show off your personality to spark better conversations.',
+            onTap: () async {
+              final selected = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (_) => const SelectPromptScreen(),
+                ),
+              );
+              if (selected == null || !context.mounted) return;
+              final result = await Navigator.of(context)
+                  .push<({String prompt, String answer})>(
+                MaterialPageRoute(
+                  builder: (_) => AnswerPromptScreen(prompt: selected),
+                ),
+              );
+              if (result == null || !context.mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(
+                    scrollTo: 'prompts',
+                    initialPrompt: result,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -465,17 +500,22 @@ class _CompletionCard extends StatelessWidget {
   final String bonus;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _CompletionCard({
     required this.iconPath,
     required this.bonus,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -492,12 +532,12 @@ class _CompletionCard extends StatelessWidget {
         children: [
           // Icon and Bonus
           SizedBox(
-            width: 56,
-            height: 60,
+            width: 64,
+            height: 80,
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(iconPath, width: 54, height: 54),
+                Image.asset(iconPath, width: 64, height: 64),
                 Positioned(
                   bottom: 0,
                   child: Container(
@@ -553,32 +593,51 @@ class _CompletionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Circular indicator
-          Container(
+          // Dashed circular indicator
+          SizedBox(
             width: 24,
             height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFE5E5EA),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.transparent,
-                ),
-              ),
+            child: CustomPaint(
+              painter: _DashedCirclePainter(),
             ),
           ),
         ],
       ),
+      ),
     );
   }
+}
+
+class _DashedCirclePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE5E5EA)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    final center = size.center(Offset.zero);
+    final radius = size.width / 2 - 1;
+    const int dashCount = 6;
+    const double gapFraction = 0.4;
+    final sweepPerSlot = (2 * math.pi) / dashCount;
+    final dashSweep = sweepPerSlot * (1 - gapFraction);
+
+    for (int i = 0; i < dashCount; i++) {
+      final startAngle = -math.pi / 2 + i * sweepPerSlot;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        dashSweep,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
 // ─────────────────────────── Platinum placeholder ───────────────────────────

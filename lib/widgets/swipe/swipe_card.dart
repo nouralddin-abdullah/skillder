@@ -354,13 +354,7 @@ class _SwipeCardState extends State<SwipeCard> {
                 const SizedBox(height: 14),
 
                 // Dynamic content (bio / skills)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: KeyedSubtree(
-                    key: ValueKey(_currentPhoto),
-                    child: _buildDynamicContent(),
-                  ),
-                ),
+                _buildDynamicContent(),
               ],
             ),
           ),
