@@ -9,22 +9,27 @@ import 'skill_match_chip.dart';
 
 class SwipeCard extends StatefulWidget {
   final DummyUser user;
-  final VoidCallback onPass;
-  final VoidCallback onSuperPitch;
-  final VoidCallback onLike;
+  final VoidCallback? onPass;
+  final VoidCallback? onSuperPitch;
+  final VoidCallback? onLike;
 
   /// Signed percentages from the card swiper (-100..100).
   final int percentX;
   final int percentY;
 
+  /// When false the bottom action buttons + swipe stickers are hidden — used
+  /// for the Edit Profile "Preview" tab where the user views their own card.
+  final bool showActions;
+
   const SwipeCard({
     super.key,
     required this.user,
-    required this.onPass,
-    required this.onSuperPitch,
-    required this.onLike,
+    this.onPass,
+    this.onSuperPitch,
+    this.onLike,
     this.percentX = 0,
     this.percentY = 0,
+    this.showActions = true,
   });
 
   @override
@@ -35,8 +40,9 @@ class _SwipeCardState extends State<SwipeCard> {
   final PageController _photoController = PageController();
   int _currentPhoto = 0;
 
-  // Bottom black zone height for buttons (15% ratio)
-  static const double _buttonZoneHeight = 100;
+  // Bottom black zone for the action buttons. Shrunk to 0 in preview mode so
+  // text content sits flush against the bottom curve.
+  double get _buttonZoneHeight => widget.showActions ? 100 : 0;
 
   @override
   void didUpdateWidget(covariant SwipeCard oldWidget) {
@@ -71,10 +77,12 @@ class _SwipeCardState extends State<SwipeCard> {
         fullscreenDialog: true,
         builder: (_) => ProfileScreen(
           user: widget.user,
-          mode: ProfileViewMode.swipe,
-          onPass: widget.onPass,
-          onSuperPitch: widget.onSuperPitch,
-          onLike: widget.onLike,
+          mode: widget.showActions
+              ? ProfileViewMode.swipe
+              : ProfileViewMode.chat,
+          onPass: widget.onPass ?? () {},
+          onSuperPitch: widget.onSuperPitch ?? () {},
+          onLike: widget.onLike ?? () {},
         ),
       ),
     );
@@ -360,21 +368,23 @@ class _SwipeCardState extends State<SwipeCard> {
           ),
 
           // ── Action buttons: in the solid black bottom zone ──
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 24,
-            child: SwipeActionButtons(
-              onPass: widget.onPass,
-              onSuperPitch: widget.onSuperPitch,
-              onLike: widget.onLike,
-              passProgress: _passProgress,
-              superProgress: _superProgress,
-              likeProgress: _likeProgress,
+          if (widget.showActions)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 24,
+              child: SwipeActionButtons(
+                onPass: widget.onPass ?? () {},
+                onSuperPitch: widget.onSuperPitch ?? () {},
+                onLike: widget.onLike ?? () {},
+                passProgress: _passProgress,
+                superProgress: _superProgress,
+                likeProgress: _likeProgress,
+              ),
             ),
-          ),
 
           // ── Swipe stickers (heart / X / star) ──
+          if (widget.showActions)
           Positioned.fill(
             bottom: _buttonZoneHeight,
             child: IgnorePointer(

@@ -92,4 +92,32 @@ class AuthService {
     final token = data['accessToken'] as String;
     await AuthStorage.saveSession(token: token, userId: '');
   }
+
+  /// Sends a Google ID token to the backend for verification. Backend looks
+  /// up or creates the user and returns our normal access token. Returns
+  /// `true` when this Google account just created a new user — the caller
+  /// uses that to prompt the onboarding "full name" field.
+  static Future<bool> loginWithGoogle({required String idToken}) async {
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/auth/google'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw ApiException(
+        statusCode: res.statusCode,
+        message: body['message']?.toString() ?? 'Google sign-in failed',
+      );
+    }
+
+    final data = body['data'] as Map<String, dynamic>;
+    final token = data['accessToken'] as String;
+    final userId = (data['userId'] as String?) ?? '';
+    final isNewUser = data['isNewUser'] == true;
+    await AuthStorage.saveSession(token: token, userId: userId);
+    return isNewUser;
+  }
 }

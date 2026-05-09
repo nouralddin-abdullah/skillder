@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_exception.dart';
 import '../../services/auth_service.dart';
+import '../../services/google_auth_service.dart';
+import '../../services/onboarding_resume.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/auth/custom_text_field.dart';
 import '../../widgets/auth/divider_with_text.dart';
 import '../../widgets/auth/primary_button.dart';
 import '../../widgets/auth/social_button.dart';
+import '../home/home_shell.dart';
 import '../onboarding/onboarding_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -78,6 +82,45 @@ class _SignupScreenState extends State<SignupScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'Network error. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _onGoogleSignup() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final idToken = await GoogleAuthService.signInAndGetIdToken();
+      if (idToken == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final isNewUser =
+          await AuthService.loginWithGoogle(idToken: idToken);
+      final me = await UserService.getMe();
+      if (!mounted) return;
+      final done = me['onboardingComplete'] == true;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => done
+              ? const HomeShell()
+              : OnboardingScreen(
+                  startStep: onboardingResumeStep(me),
+                  initialProfile: me,
+                  requireName: isNewUser,
+                ),
+        ),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Google sign-in failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -197,7 +240,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     SocialButton(
                       text: 'Sign up with Google',
                       iconPath: 'assets/icons/google.png',
-                      onPressed: () {},
+                      onPressed: _loading ? null : _onGoogleSignup,
                     ),
                     const SizedBox(height: 32),
 

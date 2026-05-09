@@ -25,10 +25,15 @@ class OnboardingScreen extends StatefulWidget {
   /// resuming, so the user can see their existing answers.
   final Map<String, dynamic>? initialProfile;
 
+  /// True for first-time Google sign-ups — shows a "Full Name" field on the
+  /// Identity step so the user can confirm/replace the name Google gave us.
+  final bool requireName;
+
   const OnboardingScreen({
     super.key,
     this.startStep = 0,
     this.initialProfile,
+    this.requireName = false,
   });
 
   @override
@@ -43,6 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Step 0: Identity
   final TextEditingController _headlineController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   Uint8List? _profileImageBytes;
 
@@ -87,6 +93,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (p != null) {
       final headline = p['headline'];
       if (headline is String) _headlineController.text = headline;
+      final name = p['name'];
+      if (name is String) _nameController.text = name;
 
       final give = p['giveSkills'];
       if (give is List) _giveSkills.addAll(give.cast<String>());
@@ -116,6 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _pageController.dispose();
     _headlineController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -123,7 +132,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Map<String, dynamic>? _payloadForCurrentStep() {
     switch (_currentStep) {
       case 0:
-        return {'headline': _headlineController.text.trim()};
+        return {
+          'headline': _headlineController.text.trim(),
+          if (widget.requireName)
+            'name': _nameController.text.trim(),
+        };
       case 1:
         return {'giveSkills': _giveSkills.toList()};
       case 2:
@@ -224,7 +237,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool get _canProceed {
     switch (_currentStep) {
       case 0:
-        return _headlineController.text.trim().isNotEmpty;
+        if (_headlineController.text.trim().isEmpty) return false;
+        if (widget.requireName && _nameController.text.trim().isEmpty) {
+          return false;
+        }
+        return true;
       case 1:
         return _giveSkills.isNotEmpty;
       case 2:
@@ -372,6 +389,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     isPickingImage: _pickingImage,
                     imageBytes: _profileImageBytes,
                     headlineController: _headlineController,
+                    nameController:
+                        widget.requireName ? _nameController : null,
                   ),
 
                   // Step 1: Give
@@ -473,7 +492,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ],
                     ),
               child: ListenableBuilder(
-                listenable: _headlineController,
+                listenable: Listenable.merge([
+                  _headlineController,
+                  _nameController,
+                ]),
                 builder: (context, _) {
                   final enabled = _canProceed && !_saving;
 

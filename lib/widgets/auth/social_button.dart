@@ -5,7 +5,7 @@ import '../../theme/app_colors.dart';
 class SocialButton extends StatelessWidget {
   final String text;
   final String iconPath;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const SocialButton({
     super.key,

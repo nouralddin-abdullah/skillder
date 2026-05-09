@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_exception.dart';
 import '../../services/auth_service.dart';
+import '../../services/google_auth_service.dart';
 import '../../services/onboarding_resume.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
@@ -51,21 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthService.login(email: email, password: password);
-      final me = await UserService.getMe();
-      if (!mounted) return;
-
-      final done = me['onboardingComplete'] == true;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => done
-              ? const HomeShell()
-              : OnboardingScreen(
-                  startStep: onboardingResumeStep(me),
-                  initialProfile: me,
-                ),
-        ),
-        (_) => false,
-      );
+      await _routeAfterAuth();
     } on ApiException catch (e) {
       if (!mounted) return;
       final msg = e.fieldErrors?.isNotEmpty == true
@@ -78,6 +65,50 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _onGoogleLogin() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final idToken = await GoogleAuthService.signInAndGetIdToken();
+      if (idToken == null) {
+        // User cancelled the picker.
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final isNewUser =
+          await AuthService.loginWithGoogle(idToken: idToken);
+      await _routeAfterAuth(requireName: isNewUser);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Google sign-in failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _routeAfterAuth({bool requireName = false}) async {
+    final me = await UserService.getMe();
+    if (!mounted) return;
+    final done = me['onboardingComplete'] == true;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => done
+            ? const HomeShell()
+            : OnboardingScreen(
+                startStep: onboardingResumeStep(me),
+                initialProfile: me,
+                requireName: requireName,
+              ),
+      ),
+      (_) => false,
+    );
   }
 
   @override
@@ -214,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SocialButton(
                       text: 'Continue with Google',
                       iconPath: 'assets/icons/google.png',
-                      onPressed: () {},
+                      onPressed: _loading ? null : _onGoogleLogin,
                     ),
                     const SizedBox(height: 40),
 

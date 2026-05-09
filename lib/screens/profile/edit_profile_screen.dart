@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../models/dummy_user.dart';
 import '../../services/api_exception.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/swipe/swipe_card.dart';
 import 'answer_prompt_screen.dart';
 import 'basics_sheet.dart';
 import 'edit_intent_screen.dart';
@@ -509,61 +511,123 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           _buildTabs(),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Media',
-                    style: GoogleFonts.inter(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+            child: _tab == 0
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Media',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Add up to 9 photos. Use prompts to share your '
+                          'personality, workspace or projects.',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: () {},
+                          child: Text(
+                            'Stand out with our photo tips',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildGrid(),
+                        const SizedBox(height: 32),
+                        _buildAboutMe(),
+                        const SizedBox(height: 28),
+                        _buildPromptsSection(),
+                        const SizedBox(height: 28),
+                        _buildInterestsSection(),
+                        const SizedBox(height: 28),
+                        _buildIntentSection(),
+                        const SizedBox(height: 28),
+                        _buildBasicsSection(),
+                        const SizedBox(height: 28),
+                        _buildLifestyleSection(),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add up to 9 photos. Use prompts to share your '
-                    'personality, workspace or projects.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Text(
-                      'Stand out with our photo tips',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildGrid(),
-                  const SizedBox(height: 32),
-                  _buildAboutMe(),
-                  const SizedBox(height: 28),
-                  _buildPromptsSection(),
-                  const SizedBox(height: 28),
-                  _buildInterestsSection(),
-                  const SizedBox(height: 28),
-                  _buildIntentSection(),
-                  const SizedBox(height: 28),
-                  _buildBasicsSection(),
-                  const SizedBox(height: 28),
-                  _buildLifestyleSection(),
-                ],
-              ),
-            ),
+                  )
+                : _buildPreview(),
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _buildPreview() {
+    // Photo URLs the SwipeCard can render. Local-only photos (just picked,
+    // not yet uploaded) are skipped — they appear once the upload finishes.
+    final photoUrls = <String>[];
+    for (final p in _photos) {
+      if (p?.url != null) photoUrls.add(p!.url!);
+    }
+
+    final me = widget.initialProfile;
+    final name = (me['name'] as String?)?.split(' ').first ?? 'You';
+    final age = me['age'] is int ? me['age'] as int : 0;
+
+    final intentLabel = _intents.isEmpty
+        ? ''
+        : (_intentMeta[_intents.first]?.label ?? '');
+
+    final previewUser = DummyUser(
+      firstName: name,
+      age: age,
+      headline: (me['headline'] as String?) ?? '',
+      bio: _aboutController.text,
+      location: '',
+      languages: const [],
+      photos: photoUrls,
+      giveSkills: _giveSkills,
+      getSkills: _getSkills,
+      intent: intentLabel,
+    );
+
+    if (photoUrls.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'Add at least one photo to preview your card.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Lock the card to a 9:16 portrait ratio (same proportion as the swipe
+    // deck) so photos render with their intended composition. Aligned to top
+    // so the card sits flush under the tabs instead of vertically centered.
+    return Align(
+      alignment: Alignment.topCenter,
+      child: AspectRatio(
+        aspectRatio: 9 / 16,
+        child: SwipeCard(
+          user: previewUser,
+          showActions: false,
+        ),
       ),
     );
   }

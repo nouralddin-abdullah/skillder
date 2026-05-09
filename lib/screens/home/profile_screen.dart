@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/profile_completion.dart';
 import '../profile/answer_prompt_screen.dart';
 import '../profile/edit_profile_screen.dart';
 import '../profile/select_prompt_screen.dart';
@@ -111,7 +112,7 @@ class _ProfileTabScreenState extends State<ProfileTabScreen> {
                       children: [
                         _AvatarWithProgress(
                           imageUrl: photoUrl,
-                          progress: 0.20,
+                          progress: profileCompletion(me) / 100,
                         ),
                         const SizedBox(height: 18),
                         Row(
@@ -513,6 +514,88 @@ class _ProfileCompletionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final photoCount =
+        profile['photos'] is List ? (profile['photos'] as List).length : 0;
+    final hasBio = profile['bio'] is String &&
+        (profile['bio'] as String).trim().isNotEmpty;
+    final hasPrompt =
+        profile['prompts'] is List && (profile['prompts'] as List).isNotEmpty;
+
+    final cards = <Widget>[];
+
+    if (photoCount < 4) {
+      cards.add(_CompletionCard(
+        iconPath: 'assets/images/complete-profile/image.png',
+        bonus: '+25%',
+        title: 'Add at least 4 photos',
+        subtitle: 'Get up to 2x more Likes with 4 pics.',
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EditProfileScreen(initialProfile: profile),
+            ),
+          );
+          onChanged();
+        },
+      ));
+    }
+
+    if (!hasBio) {
+      cards.add(_CompletionCard(
+        iconPath: 'assets/images/complete-profile/pen.png',
+        bonus: '+10%',
+        title: 'Add "About Me"',
+        subtitle: 'Get up to 25% more matches with an intro.',
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EditProfileScreen(
+                initialProfile: profile,
+                scrollTo: 'aboutMe',
+              ),
+            ),
+          );
+          onChanged();
+        },
+      ));
+    }
+
+    if (!hasPrompt) {
+      cards.add(_CompletionCard(
+        iconPath: 'assets/images/complete-profile/quotes.png',
+        bonus: '+10%',
+        title: 'Add a prompt',
+        subtitle: 'Show off your personality to spark better conversations.',
+        onTap: () async {
+          final selected = await Navigator.of(context).push<String>(
+            MaterialPageRoute(
+              builder: (_) => const SelectPromptScreen(),
+            ),
+          );
+          if (selected == null || !context.mounted) return;
+          final result = await Navigator.of(context)
+              .push<({String prompt, String answer})>(
+            MaterialPageRoute(
+              builder: (_) => AnswerPromptScreen(prompt: selected),
+            ),
+          );
+          if (result == null || !context.mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EditProfileScreen(
+                initialProfile: profile,
+                scrollTo: 'prompts',
+                initialPrompt: result,
+              ),
+            ),
+          );
+          onChanged();
+        },
+      ));
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -529,71 +612,10 @@ class _ProfileCompletionSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _CompletionCard(
-            iconPath: 'assets/images/complete-profile/image.png',
-            bonus: '+28%',
-            title: 'Add at least 4 photos',
-            subtitle: 'Get up to 2x more Likes with 6 pics.',
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      EditProfileScreen(initialProfile: profile),
-                ),
-              );
-              onChanged();
-            },
-          ),
-          const SizedBox(height: 12),
-          _CompletionCard(
-            iconPath: 'assets/images/complete-profile/pen.png',
-            bonus: '+20%',
-            title: 'Add "About Me"',
-            subtitle: 'Get up to 25% more matches with an intro.',
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => EditProfileScreen(
-                    initialProfile: profile,
-                    scrollTo: 'aboutMe',
-                  ),
-                ),
-              );
-              onChanged();
-            },
-          ),
-          const SizedBox(height: 12),
-          _CompletionCard(
-            iconPath: 'assets/images/complete-profile/quotes.png',
-            bonus: '+10%',
-            title: 'Add a prompt',
-            subtitle: 'Show off your personality to spark better conversations.',
-            onTap: () async {
-              final selected = await Navigator.of(context).push<String>(
-                MaterialPageRoute(
-                  builder: (_) => const SelectPromptScreen(),
-                ),
-              );
-              if (selected == null || !context.mounted) return;
-              final result = await Navigator.of(context)
-                  .push<({String prompt, String answer})>(
-                MaterialPageRoute(
-                  builder: (_) => AnswerPromptScreen(prompt: selected),
-                ),
-              );
-              if (result == null || !context.mounted) return;
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => EditProfileScreen(
-                    initialProfile: profile,
-                    scrollTo: 'prompts',
-                    initialPrompt: result,
-                  ),
-                ),
-              );
-              onChanged();
-            },
-          ),
+          for (int i = 0; i < cards.length; i++) ...[
+            cards[i],
+            if (i < cards.length - 1) const SizedBox(height: 12),
+          ],
         ],
       ),
     );

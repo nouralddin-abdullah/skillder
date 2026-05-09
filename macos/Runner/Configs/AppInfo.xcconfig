@@ -8,7 +8,7 @@
 PRODUCT_NAME = skillder
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.skillder
+PRODUCT_BUNDLE_IDENTIFIER = com.skillder.app
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

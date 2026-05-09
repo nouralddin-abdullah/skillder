@@ -11,12 +11,17 @@ class IdentityStep extends StatelessWidget {
   final TextEditingController headlineController;
   final bool isPickingImage;
 
+  /// When non-null, renders a "Full name" field above the headline. Used for
+  /// brand-new Google sign-ups so the user can replace Google's display name.
+  final TextEditingController? nameController;
+
   const IdentityStep({
     super.key,
     required this.onPickImage,
     required this.imageBytes,
     required this.headlineController,
     this.isPickingImage = false,
+    this.nameController,
   });
 
   @override
@@ -112,6 +117,42 @@ class IdentityStep extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 48),
+
+          // Optional Full Name field (only for first-time Google sign-ups)
+          if (nameController != null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Your full name',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: nameController,
+              style: Theme.of(context).textTheme.bodyLarge,
+              decoration: InputDecoration(
+                hintText: 'e.g. Nour Abdo',
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 12),
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    color: AppColors.textHint,
+                    size: 20,
+                  ),
+                ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Job title field
           Align(
