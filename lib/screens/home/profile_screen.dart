@@ -3,79 +3,151 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'dart:math' as math;
 
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../profile/answer_prompt_screen.dart';
 import '../profile/edit_profile_screen.dart';
 import '../profile/select_prompt_screen.dart';
 
-class ProfileTabScreen extends StatelessWidget {
+class ProfileTabScreen extends StatefulWidget {
   const ProfileTabScreen({super.key});
 
+  @override
+  State<ProfileTabScreen> createState() => _ProfileTabScreenState();
+}
+
+class _ProfileTabScreenState extends State<ProfileTabScreen> {
   static const Color _pageGray = Color(0xFFF2F2F7);
   static const double _headerCurveHeight = 40;
 
+  Map<String, dynamic>? _me;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final me = await UserService.getMe();
+      if (!mounted) return;
+      setState(() {
+        _me = me;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load profile';
+      });
+    }
+  }
+
+  String? _firstPhotoUrl(Map<String, dynamic> me) {
+    final photos = me['photos'];
+    if (photos is List && photos.isNotEmpty) {
+      final first = photos.first;
+      if (first is Map<String, dynamic>) return first['url'] as String?;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: _pageGray,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null || _me == null) {
+      return Scaffold(
+        backgroundColor: _pageGray,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error ?? 'Something went wrong'),
+              const SizedBox(height: 12),
+              TextButton(onPressed: _load, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final me = _me!;
+    final name = (me['name'] as String?) ?? 'Your profile';
+    final photoUrl = _firstPhotoUrl(me);
+
     return Scaffold(
       backgroundColor: _pageGray,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── White top block with curved bottom ──
-              ClipPath(
-                clipper: _BottomCurveClipper(),
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.only(
-                    top: 56,
-                    bottom: _headerCurveHeight + 40,
-                  ),
-                  child: Column(
-                    children: [
-                      const _AvatarWithProgress(
-                        imageUrl:
-                            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-                        progress: 0.20,
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Luna, 23',
-                            style: GoogleFonts.inter(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ClipPath(
+                  clipper: _BottomCurveClipper(),
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.only(
+                      top: 56,
+                      bottom: _headerCurveHeight + 40,
+                    ),
+                    child: Column(
+                      children: [
+                        _AvatarWithProgress(
+                          imageUrl: photoUrl,
+                          progress: 0.20,
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              name,
+                              style: GoogleFonts.inter(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.verified_rounded,
-                            size: 20,
-                            color: Colors.grey.shade400,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 22),
-                      const _ActionRow(),
-                    ],
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.verified_rounded,
+                              size: 20,
+                              color: Colors.grey.shade400,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        _ActionRow(profile: me, onChanged: _load),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
-              // ── Profile Completion Section ──
-              const SizedBox(height: 40),
-              const _ProfileCompletionSection(),
+                const SizedBox(height: 40),
+                _ProfileCompletionSection(profile: me, onChanged: _load),
 
-              // ── Gray section below with Platinum placeholder cards ──
-              const SizedBox(height: 72),
-              _PlatinumCarousel(),
-              const SizedBox(height: 32),
-            ],
+                const SizedBox(height: 72),
+                _PlatinumCarousel(),
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
         ),
       ),
@@ -86,7 +158,7 @@ class ProfileTabScreen extends StatelessWidget {
 // ─────────────────────────── Avatar + progress ───────────────────────────
 
 class _AvatarWithProgress extends StatelessWidget {
-  final String imageUrl;
+  final String? imageUrl;
   final double progress; // 0.0 – 1.0
 
   const _AvatarWithProgress({
@@ -120,11 +192,21 @@ class _AvatarWithProgress extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: NetworkImage(imageUrl),
-                  fit: BoxFit.cover,
-                ),
+                color: const Color(0xFFE5E5EA),
+                image: imageUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(imageUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
+              child: imageUrl == null
+                  ? const Icon(
+                      Icons.person_rounded,
+                      size: 56,
+                      color: Colors.white,
+                    )
+                  : null,
             ),
           ),
           // Percent pill
@@ -203,7 +285,9 @@ class _DashedRingPainter extends CustomPainter {
 // ─────────────────────────── 3 action buttons ───────────────────────────
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow();
+  final Map<String, dynamic> profile;
+  final VoidCallback onChanged;
+  const _ActionRow({required this.profile, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -235,12 +319,14 @@ class _ActionRow extends StatelessWidget {
                 ),
                 redDot: true,
               ),
-              onTap: () {
-                Navigator.of(context).push(
+              onTap: () async {
+                await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const EditProfileScreen(),
+                    builder: (_) =>
+                        EditProfileScreen(initialProfile: profile),
                   ),
                 );
+                onChanged();
               },
             ),
           ),
@@ -418,7 +504,12 @@ class _BottomCurveClipper extends CustomClipper<Path> {
 // ─────────────────────────── Profile Completion ───────────────────────────
 
 class _ProfileCompletionSection extends StatelessWidget {
-  const _ProfileCompletionSection();
+  final Map<String, dynamic> profile;
+  final VoidCallback onChanged;
+  const _ProfileCompletionSection({
+    required this.profile,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -443,9 +534,15 @@ class _ProfileCompletionSection extends StatelessWidget {
             bonus: '+28%',
             title: 'Add at least 4 photos',
             subtitle: 'Get up to 2x more Likes with 6 pics.',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      EditProfileScreen(initialProfile: profile),
+                ),
+              );
+              onChanged();
+            },
           ),
           const SizedBox(height: 12),
           _CompletionCard(
@@ -453,11 +550,17 @@ class _ProfileCompletionSection extends StatelessWidget {
             bonus: '+20%',
             title: 'Add "About Me"',
             subtitle: 'Get up to 25% more matches with an intro.',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const EditProfileScreen(scrollTo: 'aboutMe'),
-              ),
-            ),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(
+                    initialProfile: profile,
+                    scrollTo: 'aboutMe',
+                  ),
+                ),
+              );
+              onChanged();
+            },
           ),
           const SizedBox(height: 12),
           _CompletionCard(
@@ -479,14 +582,16 @@ class _ProfileCompletionSection extends StatelessWidget {
                 ),
               );
               if (result == null || !context.mounted) return;
-              Navigator.of(context).push(
+              await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => EditProfileScreen(
+                    initialProfile: profile,
                     scrollTo: 'prompts',
                     initialPrompt: result,
                   ),
                 ),
               );
+              onChanged();
             },
           ),
         ],

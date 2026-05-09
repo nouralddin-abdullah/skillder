@@ -9,12 +9,14 @@ class IdentityStep extends StatelessWidget {
   final VoidCallback onPickImage;
   final Uint8List? imageBytes;
   final TextEditingController headlineController;
+  final bool isPickingImage;
 
   const IdentityStep({
     super.key,
     required this.onPickImage,
     required this.imageBytes,
     required this.headlineController,
+    this.isPickingImage = false,
   });
 
   @override
@@ -46,7 +48,7 @@ class IdentityStep extends StatelessWidget {
 
           // Profile picture upload
           GestureDetector(
-            onTap: onPickImage,
+            onTap: isPickingImage ? null : onPickImage,
             child: Container(
               width: 160,
               height: 160,
@@ -59,42 +61,54 @@ class IdentityStep extends StatelessWidget {
                   strokeAlign: BorderSide.strokeAlignOutside,
                 ),
               ),
-              child: hasImage
-                  ? ClipOval(
-                      child: Image.memory(
-                        imageBytes!,
-                        width: 160,
-                        height: 160,
-                        fit: BoxFit.cover,
+              child: isPickingImage
+                  ? Center(
+                      child: SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
                       ),
                     )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            shape: BoxShape.circle,
+                  : hasImage
+                      ? ClipOval(
+                          child: Image.memory(
+                            imageBytes!,
+                            width: 160,
+                            height: 160,
+                            fit: BoxFit.cover,
                           ),
-                          child: const Icon(
-                            Icons.camera_alt_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: AppColors.primaryGradient,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Add Photo',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Add Photo',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
             ),
           ),
           const SizedBox(height: 48),

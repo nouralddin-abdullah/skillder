@@ -1,15 +1,84 @@
 import 'package:flutter/material.dart';
 
+import '../../services/api_exception.dart';
+import '../../services/auth_service.dart';
+import '../../services/onboarding_resume.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/auth/custom_text_field.dart';
 import '../../widgets/auth/divider_with_text.dart';
 import '../../widgets/auth/primary_button.dart';
 import '../../widgets/auth/social_button.dart';
+import '../home/home_shell.dart';
+import '../onboarding/onboarding_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Please enter your email and password');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await AuthService.login(email: email, password: password);
+      final me = await UserService.getMe();
+      if (!mounted) return;
+
+      final done = me['onboardingComplete'] == true;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => done
+              ? const HomeShell()
+              : OnboardingScreen(
+                  startStep: onboardingResumeStep(me),
+                  initialProfile: me,
+                ),
+        ),
+        (_) => false,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final msg = e.fieldErrors?.isNotEmpty == true
+          ? e.fieldErrors!.first.message
+          : e.message;
+      setState(() => _error = msg);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Network error. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +138,8 @@ class LoginScreen extends StatelessWidget {
                     const SizedBox(height: 48),
 
                     // Email field
-                    const CustomTextField(
+                    CustomTextField(
+                      controller: _emailController,
                       hintText: 'Email address',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
@@ -77,7 +147,8 @@ class LoginScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // Password field
-                    const CustomTextField(
+                    CustomTextField(
+                      controller: _passwordController,
                       hintText: 'Password',
                       prefixIcon: Icons.lock_outline_rounded,
                       isPassword: true,
@@ -113,14 +184,25 @@ class LoginScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 28),
 
                     // Login button
                     PrimaryButton(
-                      text: 'Log In',
-                      onPressed: () {
-                        print('Login button pressed');
-                      },
+                      text: _loading ? 'Logging in...' : 'Log In',
+                      onPressed: _loading ? null : _onLogin,
                     ),
                     const SizedBox(height: 28),
 
@@ -132,9 +214,7 @@ class LoginScreen extends StatelessWidget {
                     SocialButton(
                       text: 'Continue with Google',
                       iconPath: 'assets/icons/google.png',
-                      onPressed: () {
-                        print('Google sign-in pressed');
-                      },
+                      onPressed: () {},
                     ),
                     const SizedBox(height: 40),
 

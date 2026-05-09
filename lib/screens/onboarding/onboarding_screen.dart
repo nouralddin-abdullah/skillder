@@ -1,9 +1,12 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../services/api_exception.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/onboarding/onboarding_progress.dart';
 import '../home/home_shell.dart';
@@ -15,7 +18,18 @@ import 'steps/skills_step.dart';
 import 'steps/welcome_step.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  /// Step index to start on (0–6). Used when resuming a partial onboarding.
+  final int startStep;
+
+  /// Optional profile from `GET /users/me` used to pre-fill fields when
+  /// resuming, so the user can see their existing answers.
+  final Map<String, dynamic>? initialProfile;
+
+  const OnboardingScreen({
+    super.key,
+    this.startStep = 0,
+    this.initialProfile,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -24,8 +38,8 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   static const int _totalSteps = 7; // 0-6
 
-  final PageController _pageController = PageController();
-  int _currentStep = 0;
+  late final PageController _pageController;
+  late int _currentStep;
 
   // Step 0: Identity
   final TextEditingController _headlineController = TextEditingController();
@@ -56,6 +70,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Step 6: Welcome (no skip, no progress bar)
 
+  bool _saving = false;
+  bool _pickingImage = false;
+  bool _photoUploaded = false;
+  String? _pendingPhotoPath;
+  Uint8List? _pendingPhotoBytes;
+  String? _saveError;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStep = widget.startStep.clamp(0, _totalSteps - 1);
+    _pageController = PageController(initialPage: _currentStep);
+
+    final p = widget.initialProfile;
+    if (p != null) {
+      final headline = p['headline'];
+      if (headline is String) _headlineController.text = headline;
+
+      final give = p['giveSkills'];
+      if (give is List) _giveSkills.addAll(give.cast<String>());
+
+      final get = p['getSkills'];
+      if (get is List) _getSkills.addAll(get.cast<String>());
+
+      final intents = p['intents'];
+      if (intents is List) _selectedIntents.addAll(intents.cast<String>());
+
+      _education = p['education'] as String?;
+      _careerStage = p['careerStage'] as String?;
+      _domain = p['domain'] as String?;
+      _workStyle = p['workStyle'] as String?;
+      _fuelSource = p['fuelSource'] as String?;
+      _focusSoundtrack = p['focusSoundtrack'] as String?;
+      _rechargeMode = p['rechargeMode'] as String?;
+
+      // If photo already exists on the server, mark as uploaded so we don't
+      // re-upload anything during step-0 if the user just hits Continue.
+      final photos = p['photos'];
+      if (photos is List && photos.isNotEmpty) _photoUploaded = true;
+    }
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -63,7 +119,79 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _nextStep() {
+  /// Build the PATCH body for the current step.
+  Map<String, dynamic>? _payloadForCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        return {'headline': _headlineController.text.trim()};
+      case 1:
+        return {'giveSkills': _giveSkills.toList()};
+      case 2:
+        return {'getSkills': _getSkills.toList()};
+      case 3:
+        return {'intents': _selectedIntents.toList()};
+      case 4:
+        return {
+          if (_education != null) 'education': _education,
+          if (_careerStage != null) 'careerStage': _careerStage,
+          if (_domain != null) 'domain': _domain,
+          if (_workStyle != null) 'workStyle': _workStyle,
+        };
+      case 5:
+        return {
+          if (_fuelSource != null) 'fuelSource': _fuelSource,
+          if (_focusSoundtrack != null) 'focusSoundtrack': _focusSoundtrack,
+          if (_rechargeMode != null) 'rechargeMode': _rechargeMode,
+        };
+      case 6:
+        return {
+          'acceptedHouseRules': true,
+          'onboardingComplete': true,
+        };
+    }
+    return null;
+  }
+
+  Future<void> _nextStep() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+
+    try {
+      // Step 0: also upload photo if user picked one and it isn't uploaded yet.
+      if (_currentStep == 0 &&
+          !_photoUploaded &&
+          (_pendingPhotoPath != null || _pendingPhotoBytes != null)) {
+        await UserService.uploadPhoto(
+          filePath: _pendingPhotoPath,
+          bytes: _pendingPhotoBytes,
+        );
+        _photoUploaded = true;
+      }
+
+      final payload = _payloadForCurrentStep();
+      if (payload != null && payload.isNotEmpty) {
+        await UserService.patchMe(payload);
+      }
+    } on ApiException catch (e) {
+      setState(() {
+        _saving = false;
+        _saveError = e.message;
+      });
+      return;
+    } catch (_) {
+      setState(() {
+        _saving = false;
+        _saveError = 'Network error. Please try again.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
     if (_currentStep < _totalSteps - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -71,7 +199,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
       setState(() => _currentStep++);
     } else {
-      // Onboarding complete — navigate to home
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeShell()),
@@ -188,7 +315,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     // Skip button — only on skippable steps
                     if (_isSkippable)
                       TextButton(
-                        onPressed: _nextStep,
+                        onPressed: _saving ? null : _nextStep,
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(40, 40),
@@ -219,17 +346,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   // Step 0: Identity
                   IdentityStep(
                     onPickImage: () async {
-                      final XFile? picked = await _imagePicker.pickImage(
-                        source: ImageSource.gallery,
-                        maxWidth: 800,
-                        maxHeight: 800,
-                        imageQuality: 85,
-                      );
-                      if (picked != null) {
-                        final bytes = await picked.readAsBytes();
-                        setState(() => _profileImageBytes = bytes);
+                      if (_pickingImage) return;
+                      setState(() => _pickingImage = true);
+                      try {
+                        final XFile? picked = await _imagePicker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 800,
+                          maxHeight: 800,
+                          imageQuality: 85,
+                        );
+                        if (picked != null) {
+                          final bytes = await picked.readAsBytes();
+                          if (!mounted) return;
+                          setState(() {
+                            _profileImageBytes = bytes;
+                            _pendingPhotoPath = kIsWeb ? null : picked.path;
+                            _pendingPhotoBytes = kIsWeb ? bytes : null;
+                            _photoUploaded = false;
+                          });
+                        }
+                      } finally {
+                        if (mounted) setState(() => _pickingImage = false);
                       }
                     },
+                    isPickingImage: _pickingImage,
                     imageBytes: _profileImageBytes,
                     headlineController: _headlineController,
                   ),
@@ -335,81 +475,108 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: ListenableBuilder(
                 listenable: _headlineController,
                 builder: (context, _) {
-                  final enabled = _canProceed;
+                  final enabled = _canProceed && !_saving;
 
-                  // Welcome step: solid black button
+                  Widget buttonChild() {
+                    if (_saving) {
+                      return const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      );
+                    }
+                    return Text(
+                      _buttonLabel,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: enabled || _isWelcome
+                            ? Colors.white
+                            : AppColors.textHint,
+                      ),
+                    );
+                  }
+
+                  Widget button;
                   if (_isWelcome) {
-                    return SizedBox(
+                    button = SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _nextStep,
+                        onPressed: _saving ? null : _nextStep,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.textPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        child: Text(
-                          _buttonLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        child: buttonChild(),
+                      ),
+                    );
+                  } else {
+                    button = SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        decoration: BoxDecoration(
+                          gradient: enabled
+                              ? AppColors.primaryGradient
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFFE0E0E0),
+                                    Color(0xFFE0E0E0),
+                                  ],
+                                ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: enabled
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: enabled ? _nextStep : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
+                          child: buttonChild(),
                         ),
                       ),
                     );
                   }
 
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      decoration: BoxDecoration(
-                        gradient: enabled
-                            ? AppColors.primaryGradient
-                            : const LinearGradient(
-                                colors: [
-                                  Color(0xFFE0E0E0),
-                                  Color(0xFFE0E0E0),
-                                ],
-                              ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: enabled
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: enabled ? _nextStep : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          disabledBackgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          _buttonLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_saveError != null) ...[
+                        Text(
+                          _saveError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.error,
                             fontWeight: FontWeight.w600,
-                            color: enabled
-                                ? Colors.white
-                                : AppColors.textHint,
+                            fontSize: 13,
                           ),
                         ),
-                      ),
-                    ),
+                        const SizedBox(height: 10),
+                      ],
+                      button,
+                    ],
                   );
                 },
               ),

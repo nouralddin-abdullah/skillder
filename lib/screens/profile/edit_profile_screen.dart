@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../services/api_exception.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import 'answer_prompt_screen.dart';
 import 'basics_sheet.dart';
@@ -22,7 +25,17 @@ const Map<String, ({String emoji, String label})> _intentMeta = {
 class EditProfileScreen extends StatefulWidget {
   final String? scrollTo;
   final ({String prompt, String answer})? initialPrompt;
-  const EditProfileScreen({super.key, this.scrollTo, this.initialPrompt});
+
+  /// Profile from `GET /users/me` used to hydrate every field. Required —
+  /// the parent (`ProfileTab`) fetches it before pushing this screen.
+  final Map<String, dynamic> initialProfile;
+
+  const EditProfileScreen({
+    super.key,
+    required this.initialProfile,
+    this.scrollTo,
+    this.initialPrompt,
+  });
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -34,14 +47,21 @@ class _PromptEntry {
   const _PromptEntry({required this.prompt, required this.answer});
 }
 
-/// A photo entry — remote URL, on-disk file (native), or in-memory bytes (web).
+/// A photo entry. Server-side photos always have an [id]; freshly picked
+/// photos may not (until upload completes).
 class _Photo {
+  final String? id;
   final String? url;
   final String? filePath;
   final Uint8List? bytes;
-  const _Photo.url(String this.url) : filePath = null, bytes = null;
-  const _Photo.file(String this.filePath) : url = null, bytes = null;
-  const _Photo.bytes(Uint8List this.bytes) : url = null, filePath = null;
+  final bool uploading;
+  const _Photo({
+    this.id,
+    this.url,
+    this.filePath,
+    this.bytes,
+    this.uploading = false,
+  });
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
@@ -57,19 +77,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const int _maxPrompts = 3;
 
   final TextEditingController _aboutController = TextEditingController();
+  Timer? _bioDebounce;
 
-  final List<_PromptEntry> _prompts = [
-    _PromptEntry(
-      prompt: 'The key to my heart is…',
-      answer: 'Making me laugh',
-    ),
-  ];
+  final List<_PromptEntry> _prompts = [];
 
-  // Placeholder skills (should come from onboarding state later).
-  List<String> _giveSkills = ['Flutter', 'UI Design', 'Public Speaking'];
-  List<String> _getSkills = ['Guitar', 'Spanish', 'Cooking'];
+  List<String> _giveSkills = [];
+  List<String> _getSkills = [];
 
-  Set<String> _intents = {'swap'};
+  Set<String> _intents = {};
 
   String? _education;
   String? _careerStage;
@@ -134,12 +149,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'Sleeping',
   ];
 
+  /// Send a partial PATCH to /users/me. Surfaces failures via snackbar so
+  /// the user sees them, but doesn't roll back local state — the user can
+  /// retry by changing the field again.
+  Future<void> _patch(Map<String, dynamic> fields) async {
+    try {
+      await UserService.patchMe(fields);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Save failed: ${e.message}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Try again.')),
+      );
+    }
+  }
+
   Future<void> _pickBasic({
     required IconData icon,
     required String question,
     required List<String> options,
     required String? current,
     required ValueChanged<String> onPicked,
+    required String fieldName,
   }) async {
     final result = await showBasicsSheet(
       context: context,
@@ -150,6 +185,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     if (result == null || !mounted) return;
     setState(() => onPicked(result));
+    _patch({fieldName: result});
   }
 
   Future<void> _editIntent() async {
@@ -160,6 +196,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     if (result == null || !mounted) return;
     setState(() => _intents = result);
+    _patch({'intents': result.toList()});
   }
 
   Future<void> _editSkills({required bool isGive}) async {
@@ -182,49 +219,139 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _getSkills = result;
       }
     });
+    _patch({isGive ? 'giveSkills' : 'getSkills': result});
   }
 
   Future<void> _pickPhoto(int index) async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
-    // Web: files have no on-disk path — load bytes. Native: use the file
-    // path and stream from disk (lighter on memory for 9 photos).
-    final _Photo photo;
+
+    // Show optimistic local placeholder while uploading.
+    Uint8List? bytes;
+    String? filePath;
     if (kIsWeb) {
-      final bytes = await picked.readAsBytes();
-      photo = _Photo.bytes(bytes);
+      bytes = await picked.readAsBytes();
     } else {
-      photo = _Photo.file(picked.path);
+      filePath = picked.path;
     }
+
     if (!mounted) return;
-    setState(() => _photos[index] = photo);
+    setState(() => _photos[index] = _Photo(
+          bytes: bytes,
+          filePath: filePath,
+          uploading: true,
+        ));
+
+    try {
+      final result = await UserService.uploadPhoto(
+        filePath: filePath,
+        bytes: bytes,
+        filename: kIsWeb ? 'photo.jpg' : picked.name,
+      );
+      if (!mounted) return;
+      setState(() => _photos[index] = _Photo(
+            id: result['id'] as String?,
+            url: result['url'] as String?,
+          ));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _photos[index] = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: ${e.message}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _photos[index] = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error during upload')),
+      );
+    }
   }
 
-  void _removePhoto(int index) {
+  Future<void> _removePhoto(int index) async {
+    final photo = _photos[index];
+    if (photo == null) return;
+
+    // Optimistic local removal.
     setState(() {
       for (int i = index; i < _photos.length - 1; i++) {
         _photos[i] = _photos[i + 1];
       }
       _photos[_photos.length - 1] = null;
     });
+
+    if (photo.id == null) return; // never made it to the server
+    try {
+      await UserService.deletePhoto(photo.id!);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e')),
+      );
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    _photos[0] = const _Photo.url(
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-    );
-    _photos[1] = const _Photo.url(
-      'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400',
-    );
-    _photos[2] = const _Photo.url(
-      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400',
-    );
-    _photos[3] = const _Photo.url(
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400',
-    );
-    _aboutController.addListener(() => setState(() {}));
+
+    final p = widget.initialProfile;
+
+    // Photos
+    final photos = p['photos'];
+    if (photos is List) {
+      for (int i = 0; i < photos.length && i < _photos.length; i++) {
+        final ph = photos[i];
+        if (ph is Map<String, dynamic>) {
+          _photos[i] = _Photo(
+            id: ph['id'] as String?,
+            url: ph['url'] as String?,
+          );
+        }
+      }
+    }
+
+    // About me
+    final bio = p['bio'];
+    if (bio is String) _aboutController.text = bio;
+
+    // Prompts
+    final prompts = p['prompts'];
+    if (prompts is List) {
+      for (final pr in prompts) {
+        if (pr is Map<String, dynamic>) {
+          _prompts.add(_PromptEntry(
+            prompt: pr['prompt']?.toString() ?? '',
+            answer: pr['answer']?.toString() ?? '',
+          ));
+        }
+      }
+    }
+
+    // Skills, intent
+    final give = p['giveSkills'];
+    if (give is List) _giveSkills = give.cast<String>();
+    final get = p['getSkills'];
+    if (get is List) _getSkills = get.cast<String>();
+    final intents = p['intents'];
+    if (intents is List) _intents = intents.cast<String>().toSet();
+
+    // Basics + lifestyle
+    _education = p['education'] as String?;
+    _careerStage = p['careerStage'] as String?;
+    _domain = p['domain'] as String?;
+    _workStyle = p['workStyle'] as String?;
+    _fuelSource = p['fuelSource'] as String?;
+    _focusSoundtrack = p['focusSoundtrack'] as String?;
+    _rechargeMode = p['rechargeMode'] as String?;
+
+    _aboutController.addListener(() {
+      setState(() {});
+      _bioDebounce?.cancel();
+      _bioDebounce = Timer(const Duration(milliseconds: 700), () {
+        _patch({'bio': _aboutController.text});
+      });
+    });
 
     if (widget.initialPrompt != null) {
       _prompts.add(_PromptEntry(
@@ -246,6 +373,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _bioDebounce?.cancel();
     _aboutController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -272,6 +400,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _prompts.add(
           _PromptEntry(prompt: result.prompt, answer: result.answer),
         ));
+    _patchPrompts();
   }
 
   Future<void> _editPrompt(int index) async {
@@ -294,25 +423,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (result == null || !mounted) return;
     setState(() => _prompts[index] =
         _PromptEntry(prompt: result.prompt, answer: result.answer));
+    _patchPrompts();
   }
 
   void _removePrompt(int index) {
     setState(() => _prompts.removeAt(index));
+    _patchPrompts();
+  }
+
+  void _patchPrompts() {
+    _patch({
+      'prompts': _prompts
+          .map((p) => {'prompt': p.prompt, 'answer': p.answer})
+          .toList(),
+    });
   }
 
   /// Drag-and-drop reorder. If `to` is empty, simple move. If `to` is filled,
   /// pull `from` out and insert it at `to`'s position, shifting others.
-  void _reorder(int from, int to) {
+  Future<void> _reorder(int from, int to) async {
     if (from == to) return;
-    setState(() {
-      final moving = _photos[from];
-      if (moving == null) return;
+    final moving = _photos[from];
+    if (moving == null) return;
 
-      // Remove from source by shifting subsequent items left.
+    setState(() {
       final list = List<_Photo?>.from(_photos);
       list.removeAt(from);
       list.insert(to, moving);
-      // Keep length at 9 — re-pack nulls to the end.
       final filled = list.where((p) => p != null).toList();
       while (filled.length < 9) {
         filled.add(null);
@@ -321,6 +458,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _photos[i] = filled[i];
       }
     });
+
+    // Push the new order to the server using the photo IDs.
+    final orderedIds = <String>[];
+    for (final p in _photos) {
+      if (p != null && p.id != null) orderedIds.add(p.id!);
+    }
+    if (orderedIds.length < 2) return;
+
+    try {
+      await UserService.reorderPhotos(orderedIds);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Reorder failed: $e')),
+      );
+    }
   }
 
   @override
@@ -605,6 +758,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _educationOptions,
                   current: _education,
                   onPicked: (v) => _education = v,
+                  fieldName: 'education',
                 ),
               ),
               const _BasicsDivider(),
@@ -618,6 +772,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _careerOptions,
                   current: _careerStage,
                   onPicked: (v) => _careerStage = v,
+                  fieldName: 'careerStage',
                 ),
               ),
               const _BasicsDivider(),
@@ -631,6 +786,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _domainOptions,
                   current: _domain,
                   onPicked: (v) => _domain = v,
+                  fieldName: 'domain',
                 ),
               ),
               const _BasicsDivider(),
@@ -644,6 +800,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _workStyleOptions,
                   current: _workStyle,
                   onPicked: (v) => _workStyle = v,
+                  fieldName: 'workStyle',
                 ),
               ),
             ],
@@ -677,6 +834,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _fuelOptions,
                   current: _fuelSource,
                   onPicked: (v) => _fuelSource = v,
+                  fieldName: 'fuelSource',
                 ),
               ),
               const _BasicsDivider(),
@@ -690,6 +848,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _focusOptions,
                   current: _focusSoundtrack,
                   onPicked: (v) => _focusSoundtrack = v,
+                  fieldName: 'focusSoundtrack',
                 ),
               ),
               const _BasicsDivider(),
@@ -703,6 +862,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   options: _rechargeOptions,
                   current: _rechargeMode,
                   onPicked: (v) => _rechargeMode = v,
+                  fieldName: 'rechargeMode',
                 ),
               ),
             ],
@@ -1250,34 +1410,55 @@ class _FilledPhotoSlot extends StatelessWidget {
             child: _photoImage(photo),
           ),
         ),
-        Positioned(
-          top: -6,
-          right: -6,
-          child: GestureDetector(
-            onTap: onRemove,
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
+        if (photo.uploading)
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.35),
+                child: const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.close_rounded,
-                size: 16,
-                color: AppColors.textSecondary,
+                ),
               ),
             ),
           ),
-        ),
+        if (!photo.uploading)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: GestureDetector(
+              onTap: onRemove,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
