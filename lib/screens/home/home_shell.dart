@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/chat_outbox_service.dart';
+import '../../services/chat_socket_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/chat/safety_tips_dialog.dart';
 import 'chat_screen.dart';
@@ -17,8 +21,68 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Drain any messages queued offline in a previous session — independent
+    // of which tab the user lands on first.
+    unawaited(_bootChatStack());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(_resumeRealtime());
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        unawaited(_pauseRealtime());
+      case AppLifecycleState.inactive:
+        // Brief transitions (e.g. incoming call overlay) — leave the socket
+        // alone, it'll auto-recover.
+        break;
+    }
+  }
+
+  Future<void> _bootChatStack() async {
+    try {
+      final outbox = await ChatOutboxServiceHolder.instance();
+      await outbox.drain();
+      final socket = await ChatSocketServiceHolder.instance();
+      await socket.connect();
+    } catch (_) {
+      // Best-effort. The chat tab will retry on its own.
+    }
+  }
+
+  Future<void> _resumeRealtime() async {
+    try {
+      final socket = await ChatSocketServiceHolder.instance();
+      await socket.connect();
+      // Drain any sends queued while we were paused.
+      final outbox = await ChatOutboxServiceHolder.instance();
+      await outbox.drain();
+    } catch (_) {}
+  }
+
+  Future<void> _pauseRealtime() async {
+    try {
+      final socket = await ChatSocketServiceHolder.instance();
+      await socket.disconnect();
+    } catch (_) {}
+  }
 
   void _onNavTap(int index) {
     setState(() => _currentIndex = index);

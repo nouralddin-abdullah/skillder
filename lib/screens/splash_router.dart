@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../services/api_exception.dart';
 import '../services/auth_storage.dart';
+import '../services/chat_repository.dart';
+import '../services/chat_socket_service.dart';
+import '../services/chat_sync_service.dart';
 import '../services/onboarding_resume.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
@@ -40,7 +43,10 @@ class _SplashRouterState extends State<SplashRouter> {
       _routeForProfile(me);
     } on ApiException catch (e) {
       if (e.statusCode == 401 || e.statusCode == 403) {
+        await ChatSocketServiceHolder.reset();
         await AuthStorage.clear();
+        await ChatRepositoryHolder.reset();
+        ChatSyncServiceHolder.reset();
       }
       if (!mounted) return;
       _replace(const LoginScreen());

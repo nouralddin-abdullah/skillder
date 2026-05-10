@@ -8,7 +8,23 @@ class DummyUser {
   final List<String> photos;
   final List<String> giveSkills;
   final List<String> getSkills;
-  final String intent;
+
+  /// Intent keys: 'swap', 'colearn', 'mentor'.
+  final List<String> intents;
+
+  /// Free-form profile prompts (e.g. "The key to my heart is…" / answer).
+  final List<DummyPrompt> prompts;
+
+  // Basics — single-select strings, all optional.
+  final String? education;
+  final String? careerStage;
+  final String? domain;
+  final String? workStyle;
+
+  // Lifestyle — single-select strings, all optional.
+  final String? fuelSource;
+  final String? focusSoundtrack;
+  final String? rechargeMode;
 
   const DummyUser({
     required this.firstName,
@@ -20,9 +36,30 @@ class DummyUser {
     required this.photos,
     required this.giveSkills,
     required this.getSkills,
-    required this.intent,
+    required this.intents,
+    this.prompts = const [],
+    this.education,
+    this.careerStage,
+    this.domain,
+    this.workStyle,
+    this.fuelSource,
+    this.focusSoundtrack,
+    this.rechargeMode,
   });
 }
+
+class DummyPrompt {
+  final String prompt;
+  final String answer;
+  const DummyPrompt({required this.prompt, required this.answer});
+}
+
+/// Display metadata for an intent key.
+const Map<String, ({String emoji, String label})> intentMeta = {
+  'swap': (emoji: '🔄', label: 'Skill Swap'),
+  'colearn': (emoji: '🤝', label: 'Co-Learning'),
+  'mentor': (emoji: '🎓', label: 'Mentorship'),
+};
 
 // Current user's "get" skills — used to highlight shared matches
 const Set<String> currentUserGetSkills = {
@@ -62,7 +99,20 @@ const List<DummyUser> dummyUsers = [
     ],
     giveSkills: ['UI/UX Design', 'Figma', 'Brand Identity', 'Motion Graphics'],
     getSkills: ['Flutter', 'React', 'Python'],
-    intent: 'Skill Swap',
+    intents: ['swap'],
+    prompts: [
+      DummyPrompt(
+        prompt: 'The key to my heart is…',
+        answer: 'Pixel-perfect Figma files and a strong oat-milk latte.',
+      ),
+    ],
+    education: 'Bachelors',
+    careerStage: 'Mid-level',
+    domain: 'Design',
+    workStyle: 'Hybrid',
+    fuelSource: 'Coffee',
+    focusSoundtrack: 'Lofi Beats',
+    rechargeMode: 'Touching Grass',
   ),
   DummyUser(
     firstName: 'Marcus',
@@ -87,7 +137,24 @@ const List<DummyUser> dummyUsers = [
       'Music Production',
     ],
     getSkills: ['UI/UX Design', 'Photography', 'Public Speaking'],
-    intent: 'Mentorship',
+    intents: ['mentor'],
+    prompts: [
+      DummyPrompt(
+        prompt: 'My hidden talent is…',
+        answer: 'Reading research papers in three languages.',
+      ),
+      DummyPrompt(
+        prompt: 'Message me if you also love…',
+        answer: 'Synthesizers, neural nets, and weird sci-fi.',
+      ),
+    ],
+    education: 'PhD',
+    careerStage: 'Senior',
+    domain: 'Technology',
+    workStyle: 'Remote',
+    fuelSource: 'Matcha',
+    focusSoundtrack: 'Lofi Beats',
+    rechargeMode: 'Cozy Gaming',
   ),
   DummyUser(
     firstName: 'Yuki',
@@ -106,7 +173,20 @@ const List<DummyUser> dummyUsers = [
     ],
     giveSkills: ['React', 'Node.js', 'Cooking', 'Sushi Making'],
     getSkills: ['Flutter', 'Machine Learning', 'Photography'],
-    intent: 'Co-Learning',
+    intents: ['colearn'],
+    prompts: [
+      DummyPrompt(
+        prompt: 'Together, we could…',
+        answer: 'Build the best app and the best dinner of our lives.',
+      ),
+    ],
+    education: 'Bachelors',
+    careerStage: 'Junior',
+    domain: 'Technology',
+    workStyle: 'Hybrid',
+    fuelSource: 'Tea',
+    focusSoundtrack: 'Silence',
+    rechargeMode: 'Reading',
   ),
   DummyUser(
     firstName: 'Alex',
@@ -125,7 +205,13 @@ const List<DummyUser> dummyUsers = [
     ],
     giveSkills: ['Photography', 'Video Editing', 'Adobe Suite', 'Storytelling'],
     getSkills: ['Flutter', 'JavaScript', 'SEO', 'Marketing'],
-    intent: 'Skill Swap',
+    intents: ['swap'],
+    education: 'Trade School',
+    careerStage: 'Senior',
+    domain: 'Design',
+    workStyle: 'Remote',
+    fuelSource: 'Coffee',
+    rechargeMode: 'Touching Grass',
   ),
   DummyUser(
     firstName: 'Priya',
@@ -144,7 +230,20 @@ const List<DummyUser> dummyUsers = [
     ],
     giveSkills: ['Data Science', 'Python', 'Yoga', 'Meditation'],
     getSkills: ['Piano', 'Spanish', 'Graphic Design'],
-    intent: 'Co-Learning',
+    intents: ['colearn', 'mentor'],
+    prompts: [
+      DummyPrompt(
+        prompt: 'My simple pleasures…',
+        answer: 'Sunrise yoga, fresh chai, and a clean dataset.',
+      ),
+    ],
+    education: 'Masters',
+    careerStage: 'Mid-level',
+    domain: 'Technology',
+    workStyle: 'Hybrid',
+    fuelSource: 'Tea',
+    focusSoundtrack: 'Silence',
+    rechargeMode: 'Sleeping',
   ),
   DummyUser(
     firstName: 'Lina',
@@ -162,6 +261,19 @@ const List<DummyUser> dummyUsers = [
     ],
     giveSkills: ['UI/UX Design', 'Illustration', 'Procreate', 'Figma'],
     getSkills: ['Flutter', 'Swift', 'JavaScript'],
-    intent: 'Skill Swap',
+    intents: ['swap'],
+    prompts: [
+      DummyPrompt(
+        prompt: 'Perks of dating me…',
+        answer: 'Custom illustrated stickers for every occasion.',
+      ),
+    ],
+    education: 'Bachelors',
+    careerStage: 'Mid-level',
+    domain: 'Design',
+    workStyle: 'Office',
+    fuelSource: 'Coffee',
+    focusSoundtrack: 'Spotify Random',
+    rechargeMode: 'Cozy Gaming',
   ),
 ];

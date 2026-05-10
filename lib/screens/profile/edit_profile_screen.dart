@@ -584,10 +584,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final name = (me['name'] as String?)?.split(' ').first ?? 'You';
     final age = me['age'] is int ? me['age'] as int : 0;
 
-    final intentLabel = _intents.isEmpty
-        ? ''
-        : (_intentMeta[_intents.first]?.label ?? '');
-
     final previewUser = DummyUser(
       firstName: name,
       age: age,
@@ -598,7 +594,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       photos: photoUrls,
       giveSkills: _giveSkills,
       getSkills: _getSkills,
-      intent: intentLabel,
+      intents: _intents.toList(),
+      prompts: _prompts
+          .map((p) => DummyPrompt(prompt: p.prompt, answer: p.answer))
+          .toList(),
+      education: _education,
+      careerStage: _careerStage,
+      domain: _domain,
+      workStyle: _workStyle,
+      fuelSource: _fuelSource,
+      focusSoundtrack: _focusSoundtrack,
+      rechargeMode: _rechargeMode,
     );
 
     if (photoUrls.isEmpty) {

@@ -6,7 +6,7 @@ import '../../theme/app_colors.dart';
 import 'photo_indicator.dart';
 import 'skill_match_chip.dart';
 
-enum ProfileViewMode { swipe, chat }
+enum ProfileViewMode { swipe, chat, preview }
 
 const Color _kPageBg = Color(0xFFF2F2F7);
 
@@ -51,6 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool get _isChatMode => widget.mode == ProfileViewMode.chat;
   bool get _isSwipeMode => widget.mode == ProfileViewMode.swipe;
+  bool get _isPreviewMode => widget.mode == ProfileViewMode.preview;
 
   @override
   Widget build(BuildContext context) {
@@ -128,8 +129,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     _intentCard(),
                     const SizedBox(height: 10),
-                    _essentialsCard(),
-                    const SizedBox(height: 10),
                     _skillsCard(
                       title: 'I can teach',
                       icon: Icons.school_outlined,
@@ -143,29 +142,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       skills: widget.user.getSkills,
                       matchAgainstCurrentUser: false,
                     ),
-                    const SizedBox(height: 20),
-                    _actionListCard(
-                      'Share ${widget.user.firstName}\'s profile',
-                      onTap: () => _placeholderAction('Share profile'),
-                    ),
                     const SizedBox(height: 10),
-                    if (_isChatMode) ...[
+                    _promptsCard(),
+                    const SizedBox(height: 10),
+                    _basicsCard(),
+                    const SizedBox(height: 10),
+                    _lifestyleCard(),
+                    if (!_isPreviewMode) ...[
+                      const SizedBox(height: 20),
                       _actionListCard(
-                        'Unmatch ${widget.user.firstName}',
-                        onTap: _showUnmatchConfirmation,
+                        'Share ${widget.user.firstName}\'s profile',
+                        onTap: () => _placeholderAction('Share profile'),
                       ),
                       const SizedBox(height: 10),
+                      if (_isChatMode) ...[
+                        _actionListCard(
+                          'Unmatch ${widget.user.firstName}',
+                          onTap: _showUnmatchConfirmation,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      _actionListCard(
+                        'Block ${widget.user.firstName}',
+                        onTap: _showBlockConfirmation,
+                      ),
+                      const SizedBox(height: 10),
+                      _actionListCard(
+                        'Report ${widget.user.firstName}',
+                        isDanger: true,
+                        onTap: () => _placeholderAction('Report'),
+                      ),
                     ],
-                    _actionListCard(
-                      'Block ${widget.user.firstName}',
-                      onTap: _showBlockConfirmation,
-                    ),
-                    const SizedBox(height: 10),
-                    _actionListCard(
-                      'Report ${widget.user.firstName}',
-                      isDanger: true,
-                      onTap: () => _placeholderAction('Report'),
-                    ),
                   ]),
                 ),
               ),
@@ -302,27 +309,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _intentCard() {
+    final intents = widget.user.intents
+        .where(intentMeta.containsKey)
+        .map((k) => intentMeta[k]!)
+        .toList();
+    if (intents.isEmpty) return const SizedBox.shrink();
+
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader(Icons.search_rounded, 'Looking for'),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              Text(
-                '🤝',
-                style: GoogleFonts.inter(fontSize: 18),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                widget.user.intent,
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              for (final i in intents)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(i.emoji, style: GoogleFonts.inter(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Text(
+                      i.label,
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
             ],
           ),
         ],
@@ -330,38 +348,154 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _essentialsCard() {
+  Widget _promptsCard() {
+    if (widget.user.prompts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (int i = 0; i < widget.user.prompts.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '“',
+                      style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.user.prompts[i].prompt,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 22),
+                  child: Text(
+                    widget.user.prompts[i].answer,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _basicsCard() {
+    final entries = <({IconData icon, String label, String value})>[];
+    void add(IconData icon, String label, String? value) {
+      if (value != null && value.trim().isNotEmpty) {
+        entries.add((icon: icon, label: label, value: value));
+      }
+    }
+
+    add(Icons.school_outlined, 'Education', widget.user.education);
+    add(Icons.work_outline_rounded, 'Career stage', widget.user.careerStage);
+    add(Icons.business_center_outlined, 'Domain', widget.user.domain);
+    add(Icons.laptop_mac_outlined, 'Work style', widget.user.workStyle);
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
     return _card(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.local_offer_outlined, 'Essentials'),
+          _cardHeader(Icons.badge_outlined, 'Basics'),
           const SizedBox(height: 14),
-          _essentialRow(Icons.location_on_outlined, widget.user.location),
-          const Divider(color: AppColors.divider, height: 24),
-          _essentialRow(
-              Icons.translate_rounded, widget.user.languages.join(', ')),
+          for (int i = 0; i < entries.length; i++) ...[
+            _basicsRow(entries[i].icon, entries[i].label, entries[i].value),
+            if (i < entries.length - 1)
+              const Divider(color: AppColors.divider, height: 24),
+          ],
+          const SizedBox(height: 4),
         ],
       ),
     );
   }
 
-  Widget _essentialRow(IconData icon, String text) {
+  Widget _lifestyleCard() {
+    final entries = <({IconData icon, String label, String value})>[];
+    void add(IconData icon, String label, String? value) {
+      if (value != null && value.trim().isNotEmpty) {
+        entries.add((icon: icon, label: label, value: value));
+      }
+    }
+
+    add(Icons.local_cafe_outlined, 'Fuel source', widget.user.fuelSource);
+    add(Icons.headphones_outlined, 'Focus soundtrack',
+        widget.user.focusSoundtrack);
+    add(Icons.battery_charging_full_rounded, 'Recharge mode',
+        widget.user.rechargeMode);
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return _card(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardHeader(Icons.spa_outlined, 'Lifestyle'),
+          const SizedBox(height: 14),
+          for (int i = 0; i < entries.length; i++) ...[
+            _basicsRow(entries[i].icon, entries[i].label, entries[i].value),
+            if (i < entries.length - 1)
+              const Divider(color: AppColors.divider, height: 24),
+          ],
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _basicsRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.textPrimary),
+          Icon(icon, size: 20, color: AppColors.textSecondary),
           const SizedBox(width: 12),
-          Flexible(
+          Expanded(
             child: Text(
-              text,
+              label,
               style: GoogleFonts.inter(
                 fontSize: 15,
-                color: AppColors.textPrimary,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -375,6 +509,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required List<String> skills,
     required bool matchAgainstCurrentUser,
   }) {
+    if (skills.isEmpty) return const SizedBox.shrink();
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,6 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 label: skill,
                 isMatch: matchAgainstCurrentUser &&
                     currentUserGetSkills.contains(skill),
+                onDark: false,
               );
             }).toList(),
           ),

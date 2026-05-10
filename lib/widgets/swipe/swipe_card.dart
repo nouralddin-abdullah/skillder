@@ -79,7 +79,7 @@ class _SwipeCardState extends State<SwipeCard> {
           user: widget.user,
           mode: widget.showActions
               ? ProfileViewMode.swipe
-              : ProfileViewMode.chat,
+              : ProfileViewMode.preview,
           onPass: widget.onPass ?? () {},
           onSuperPitch: widget.onSuperPitch ?? () {},
           onLike: widget.onLike ?? () {},
@@ -166,12 +166,14 @@ class _SwipeCardState extends State<SwipeCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111418),
-        borderRadius: BorderRadius.vertical(
-          top: Radius.zero,
-          bottom: Radius.circular(40),
-        ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111418),
+        borderRadius: widget.showActions
+            ? const BorderRadius.vertical(
+                top: Radius.zero,
+                bottom: Radius.circular(40),
+              )
+            : BorderRadius.zero,
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -224,6 +226,8 @@ class _SwipeCardState extends State<SwipeCard> {
           ),
 
           // ── Gradient: blends bottom of image into the black zone ──
+          // In preview mode there's no black zone, so we cap the max alpha at
+          // 0.6 to keep text readable without fading to pure black.
           Positioned(
             left: 0,
             right: 0,
@@ -235,13 +239,21 @@ class _SwipeCardState extends State<SwipeCard> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      const Color(0xFF111418).withValues(alpha: 0.05),
-                      const Color(0xFF111418).withValues(alpha: 0.3),
-                      const Color(0xFF111418).withValues(alpha: 0.7),
-                      const Color(0xFF111418),
-                    ],
+                    colors: widget.showActions
+                        ? [
+                            Colors.transparent,
+                            const Color(0xFF111418).withValues(alpha: 0.05),
+                            const Color(0xFF111418).withValues(alpha: 0.3),
+                            const Color(0xFF111418).withValues(alpha: 0.7),
+                            const Color(0xFF111418),
+                          ]
+                        : [
+                            Colors.transparent,
+                            const Color(0xFF111418).withValues(alpha: 0.05),
+                            const Color(0xFF111418).withValues(alpha: 0.25),
+                            const Color(0xFF111418).withValues(alpha: 0.45),
+                            const Color(0xFF111418).withValues(alpha: 0.6),
+                          ],
                     stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
                   ),
                 ),
