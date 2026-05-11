@@ -61,8 +61,14 @@ class MessageEntity {
   final MessageStatus status;
 
   /// Local-only image bytes shown while an upload is still uploading. Once
-  /// the message is confirmed by the server, [mediaUrl] takes over.
+  /// the message is confirmed by the server, [mediaUrl] takes over. Used
+  /// for video thumbnails (always bytes) and web image previews.
   final Uint8List? localImageBytes;
+
+  /// Local-only file-on-disk path for an in-flight image. Preferred over
+  /// [localImageBytes] on native — Flutter's image cache decodes the file
+  /// once and keeps it efficiently without us holding the bytes in RAM.
+  final String? localImagePath;
 
   const MessageEntity({
     required this.clientId,
@@ -83,6 +89,7 @@ class MessageEntity {
     this.editedAt,
     this.deletedAt,
     this.localImageBytes,
+    this.localImagePath,
   });
 
   bool get isSystem => kind == MessageKind.system;
@@ -131,6 +138,7 @@ class MessageEntity {
     DateTime? createdAt,
     MessageStatus? status,
     Uint8List? localImageBytes,
+    String? localImagePath,
     bool clearLocalImageBytes = false,
   }) {
     return MessageEntity(
@@ -152,8 +160,10 @@ class MessageEntity {
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
-      localImageBytes:
-          clearLocalImageBytes ? null : (localImageBytes ?? this.localImageBytes),
+      localImageBytes: clearLocalImageBytes
+          ? null
+          : (localImageBytes ?? this.localImageBytes),
+      localImagePath: localImagePath ?? this.localImagePath,
     );
   }
 }

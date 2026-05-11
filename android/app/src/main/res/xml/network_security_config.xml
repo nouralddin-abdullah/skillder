@@ -21,6 +21,6 @@
         <domain-suffix>192.168.0.0</domain-suffix>
         <domain-suffix>192.168.1.0</domain-suffix>
         <!-- Fallback: any 192.168.* / 10.* / 172.16-31.* address -->
-        <domain>192.168.1.17</domain>
+        <domain includeSubdomains="false">192.168.1.17</domain>
     </domain-config>
 </network-security-config>

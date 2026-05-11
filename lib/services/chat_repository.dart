@@ -106,9 +106,53 @@ class ChatRepository {
   // ─────────────────────────── Messages ────────────────────────────────
 
   Stream<List<MessageEntity>> watchMessages(String chatId) {
-    return _db.watchMessagesForChat(chatId).map(
-          (rows) => rows.map(_messageRowToEntity).toList(growable: false),
-        );
+    return _db.watchMessagesForChat(chatId).asyncMap((rows) async {
+      final entities = <MessageEntity>[];
+      for (final row in rows) {
+        entities.add(await _hydrateMessage(row));
+      }
+      return entities;
+    });
+  }
+
+  /// Maps a Drift row to a [MessageEntity], pulling in the optimistic
+  /// preview (file path on native, bytes on web; thumbnail bytes for
+  /// videos) from the outbox for any in-flight `sending` media row.
+  ///
+  /// Without this, the bubble has no `mediaUrl` yet AND no local source,
+  /// so it falls back to the broken-image placeholder until the upload
+  /// confirms. With it, the bubble shows the actual photo/thumbnail
+  /// instantly and the upload spinner overlays on top.
+  Future<MessageEntity> _hydrateMessage(Message row) async {
+    final entity = _messageRowToEntity(row);
+    if (entity.status != MessageStatus.sending) return entity;
+    if (!entity.hasMedia) return entity;
+    final outboxRow = await (_db.select(_db.outboxRows)
+          ..where((o) => o.clientId.equals(entity.clientId)))
+        .getSingleOrNull();
+    if (outboxRow == null) return entity;
+
+    if (entity.hasVideo) {
+      // Videos always use the (small) thumbnail bytes for the bubble
+      // poster — the full video file isn't an image.
+      final thumb = outboxRow.mediaThumbnailLocalBytes;
+      if (thumb != null) {
+        return entity.copyWith(localImageBytes: thumb);
+      }
+      return entity;
+    }
+
+    // Image: prefer the file path on native (lets `Image.file` use
+    // Flutter's built-in image cache), fall back to bytes on web.
+    final path = outboxRow.mediaLocalPath;
+    final bytes = outboxRow.mediaLocalBytes;
+    if (path != null) {
+      return entity.copyWith(localImagePath: path);
+    }
+    if (bytes != null) {
+      return entity.copyWith(localImageBytes: bytes);
+    }
+    return entity;
   }
 
   Future<void> upsertMessages(Iterable<MessageEntity> messages) async {

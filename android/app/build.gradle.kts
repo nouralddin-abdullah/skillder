@@ -35,6 +35,15 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Minification stays OFF — keeps stack traces readable in
+            // production crashes and avoids needing keep rules for every
+            // Flutter plugin we add. The Media3 LogSessionId crash on
+            // Android <12 is mitigated entirely by the
+            // `disableHorizontalClassMerging` system prop in
+            // android/gradle.properties (that flag works regardless of
+            // minify state). proguard-rules.pro is kept on disk as
+            // insurance in case minification is re-enabled later.
         }
     }
 }

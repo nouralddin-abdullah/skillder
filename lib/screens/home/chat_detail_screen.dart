@@ -7,8 +7,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_player/video_player.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../models/chat_models.dart';
 import '../../models/dummy_user.dart';
@@ -20,7 +18,7 @@ import '../../services/chat_socket_service.dart';
 import '../../services/chat_sync_service.dart';
 import '../../services/matching_service.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/chat/image_caption_sheet.dart';
+import '../chat/media_preview_screen.dart';
 import '../../widgets/chat/image_viewer.dart';
 import '../../widgets/chat/video_viewer.dart';
 import '../../widgets/swipe/profile_bottom_sheet.dart';
@@ -373,27 +371,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final bytes = await image.readAsBytes();
     if (!mounted) return;
 
-    final caption = await showMediaCaptionSheet(
+    final result = await showMediaPreview(
       context: context,
       imageBytes: bytes,
     );
-    if (caption == null || !mounted) return;
+    if (result == null || !mounted) return;
 
     final reply = _replyingTo;
     setState(() => _replyingTo = null);
 
-    final contentType =
-        ChatService.mimeFromFilename(image.name) ?? 'image/jpeg';
+    // If the user edited the image inside the preview, prefer the edited
+    // bytes (re-encoded JPEG by `pro_image_editor`) over the original.
+    final editedBytes = result.editedImageBytes;
+    final outgoingBytes = editedBytes ?? bytes;
+    final outgoingFilename =
+        editedBytes != null ? 'edited.jpg' : image.name;
+    final outgoingContentType = editedBytes != null
+        ? 'image/jpeg'
+        : (ChatService.mimeFromFilename(image.name) ?? 'image/jpeg');
+    // The original file path on disk no longer matches the bytes after an
+    // edit — fall back to the in-memory bytes path in that case.
+    final outgoingFilePath =
+        (kIsWeb || editedBytes != null) ? null : image.path;
 
     await outbox.enqueueImage(
       chatId: _chat.chatId,
       senderId: _currentUserId,
-      bytes: bytes,
-      filePath: kIsWeb ? null : image.path,
-      caption: caption,
+      bytes: outgoingBytes,
+      filePath: outgoingFilePath,
+      caption: result.caption,
       replyToId: reply?.id,
-      filename: image.name,
-      contentType: contentType,
+      filename: outgoingFilename,
+      contentType: outgoingContentType,
     );
   }
 
@@ -402,108 +411,73 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final outbox = _outbox;
     if (outbox == null) return;
 
-    // Backend caps videos at 100MB. Reject early before any read happens.
+    // Backend caps videos at 100MB. Reject early — `length()` is a cheap
+    // file stat, no codec init.
     final lengthBytes = await picked.length();
     if (lengthBytes > 100 * 1024 * 1024) {
       _showError('Videos must be smaller than 100MB');
       return;
     }
-
-    final probe = await _probeVideo(picked);
-    if (probe == null) {
-      _showError('Could not read video');
-      return;
-    }
-    if (probe.durationSeconds > 600) {
-      _showError('Videos must be 10 minutes or shorter');
-      return;
-    }
     if (!mounted) return;
 
-    // Generate the still-frame thumbnail BEFORE asking for a caption so
-    // the caption sheet can fall back to it as a poster while the video
-    // preview initializes.
-    final thumbBytes = await _generateVideoThumbnail(picked.path);
-    if (!mounted) return;
-
-    final caption = await showMediaCaptionSheet(
+    // Open the preview immediately. The preview owns the only
+    // VideoPlayerController we need (no pre-probe), generates its own
+    // thumbnail in parallel with controller init, and enforces the
+    // duration cap with a banner + disabled Send. Metadata + thumbnail
+    // come back in [MediaPreviewResult].
+    final result = await showMediaPreview(
       context: context,
       videoFilePath: kIsWeb ? null : picked.path,
       videoUrl: kIsWeb ? picked.path : null,
-      posterBytes: thumbBytes,
     );
-    if (caption == null || !mounted) return;
+    if (result == null || !mounted) return;
+
+    final width = result.videoWidth;
+    final height = result.videoHeight;
+    final durationSeconds = result.videoDurationSeconds;
+    if (width == null || height == null || durationSeconds == null) {
+      // Should be unreachable — preview disables Send until probed —
+      // but guard so we never enqueue a video with zeroed metadata.
+      _showError('Could not read video');
+      return;
+    }
+    final thumbBytes = result.videoThumbnailBytes ?? Uint8List(0);
+    final caption = result.caption;
+
+    final outgoingPath = result.editedVideoPath ?? picked.path;
+    final wasEdited = result.editedVideoPath != null;
 
     final reply = _replyingTo;
     setState(() => _replyingTo = null);
 
-    final contentType =
-        ChatService.mimeFromFilename(picked.name) ?? 'video/mp4';
+    // After editing, the file is always mp4 (pro_video_editor's output
+    // format). Otherwise honor the picker's MIME.
+    final contentType = wasEdited
+        ? 'video/mp4'
+        : (ChatService.mimeFromFilename(picked.name) ?? 'video/mp4');
+    final outgoingFilename = wasEdited ? 'edited.mp4' : picked.name;
 
     // On native, hand the file path to the outbox — it streams from disk
     // during upload (no 100MB blob in memory). On web we have no path
     // and have to read into memory.
     Uint8List? bytesFallback;
-    if (kIsWeb) bytesFallback = await picked.readAsBytes();
+    if (kIsWeb) bytesFallback = await XFile(outgoingPath).readAsBytes();
     if (!mounted) return;
 
     await outbox.enqueueVideo(
       chatId: _chat.chatId,
       senderId: _currentUserId,
-      videoFilePath: kIsWeb ? null : picked.path,
+      videoFilePath: kIsWeb ? null : outgoingPath,
       videoBytes: bytesFallback,
-      thumbnailBytes: thumbBytes ?? Uint8List(0),
-      width: probe.width,
-      height: probe.height,
-      durationSeconds: probe.durationSeconds,
+      thumbnailBytes: thumbBytes,
+      width: width,
+      height: height,
+      durationSeconds: durationSeconds,
       contentType: contentType,
       caption: caption,
       replyToId: reply?.id,
-      filename: picked.name,
+      filename: outgoingFilename,
     );
-  }
-
-  /// Reads width/height/duration from the picked video using the
-  /// `video_player` package's metadata exposure.
-  Future<_VideoProbe?> _probeVideo(XFile file) async {
-    final controller = kIsWeb
-        ? VideoPlayerController.networkUrl(Uri.parse(file.path))
-        : VideoPlayerController.file(File(file.path));
-    try {
-      await controller.initialize();
-      final size = controller.value.size;
-      final duration = controller.value.duration;
-      if (size.width == 0 || size.height == 0) return null;
-      return _VideoProbe(
-        width: size.width.round(),
-        height: size.height.round(),
-        durationSeconds: duration.inSeconds.clamp(1, 600),
-      );
-    } catch (_) {
-      return null;
-    } finally {
-      await controller.dispose();
-    }
-  }
-
-  /// Generates a JPEG still frame from the picked video. Uses
-  /// `video_thumbnail` (~50ms on a real device).
-  Future<Uint8List?> _generateVideoThumbnail(String path) async {
-    if (kIsWeb) {
-      // video_thumbnail doesn't support web — skip the still frame and
-      // let the bubble fall back to a generic poster.
-      return null;
-    }
-    try {
-      return await VideoThumbnail.thumbnailData(
-        video: path,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 720,
-        quality: 75,
-      );
-    } catch (_) {
-      return null;
-    }
   }
 
   // ─────────────────────────── Reply / unsend ───────────────────────────
@@ -1997,14 +1971,35 @@ class _MessageBubble extends StatelessWidget {
 
   Widget _buildImage() {
     final bytes = message.localImageBytes;
+    final path = message.localImagePath;
     final isVideo = message.hasVideo;
 
     // Local optimistic preview (shown while uploading or during the brief
-    // moment between optimistic insert and server confirm).
-    if (bytes != null) {
+    // moment between optimistic insert and server confirm). Prefer the
+    // file path on native — Flutter's image cache decodes the file once
+    // and we never hold the bytes in RAM.
+    Widget? localPreview;
+    if (path != null) {
+      localPreview = Image.file(
+        File(path),
+        width: 220,
+        height: 280,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+      );
+    } else if (bytes != null) {
+      localPreview = Image.memory(
+        bytes,
+        width: 220,
+        height: 280,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+      );
+    }
+    if (localPreview != null) {
       return Stack(
         children: [
-          Image.memory(bytes, width: 220, height: 280, fit: BoxFit.cover),
+          localPreview,
           if (isVideo) _videoOverlay(),
           if (message.status == MessageStatus.sending)
             const Positioned.fill(
@@ -2219,17 +2214,6 @@ String _formatVideoDuration(int seconds) {
   String two(int v) => v.toString().padLeft(2, '0');
   if (h > 0) return '${two(h)}:${two(m)}:${two(s)}';
   return '$m:${two(s)}';
-}
-
-class _VideoProbe {
-  final int width;
-  final int height;
-  final int durationSeconds;
-  const _VideoProbe({
-    required this.width,
-    required this.height,
-    required this.durationSeconds,
-  });
 }
 
 class _AvatarPlaceholder extends StatelessWidget {

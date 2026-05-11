@@ -27,6 +27,8 @@ dependencies:
   video_player: ^2.9.2
   chewie: ^1.8.5
   video_thumbnail: ^0.5.3
+  pro_image_editor: ^12.4.4
+  pro_video_editor: ^1.16.2
 
 dev_dependencies:
   flutter_test:
