@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
+import '../features/calls/models/call_session.dart';
 import 'api_config.dart';
 import 'auth_storage.dart';
 import 'chat_sync_service.dart';
@@ -27,6 +28,33 @@ class ChatSocketService {
       StreamController<TypingNotification>.broadcast();
 
   Stream<TypingNotification> get typingStream => _typingCtl.stream;
+
+  /// Broadcast stream of call lifecycle events. The active-call controller
+  /// subscribes to this for incoming calls + state transitions on calls
+  /// we're already in. Events are typed (see [CallEvent] subtypes) and
+  /// already unwrap the `{type, seq, chatId, data, createdAt}` envelope
+  /// per CALLS_CONTRACT_ACTUAL.md §2.
+  final StreamController<CallEvent> _callCtl =
+      StreamController<CallEvent>.broadcast();
+
+  Stream<CallEvent> get callEventStream => _callCtl.stream;
+
+  /// Broadcast stream of `call.snapshot` events. Fires once per WS connect —
+  /// the server's authoritative view of the user's currently-ringing /
+  /// currently-active calls. The active-call controller subscribes so it
+  /// can rebuild local state after a cold boot or force-kill (the case
+  /// where the controller's in-memory `_session` was lost but the server
+  /// still has the call alive). See CALLS_FRONTEND_CONTRACT.md §2.
+  ///
+  /// Kept on its own stream rather than folded into `callEventStream`
+  /// because the snapshot envelope is `{type, calls[]}` — a different
+  /// shape from the per-call `{type, seq, chatId, data}` envelope — and
+  /// because the controller treats the snapshot as a *state reconcile*
+  /// rather than an event to process.
+  final StreamController<CallSnapshotEvent> _callSnapshotCtl =
+      StreamController<CallSnapshotEvent>.broadcast();
+
+  Stream<CallSnapshotEvent> get callSnapshotStream => _callSnapshotCtl.stream;
 
   ChatSocketService(this.syncService);
 
@@ -73,7 +101,13 @@ class ChatSocketService {
       ..on('message.read', _routeChatEvent)
       ..on('match.created', _routeChatEvent)
       ..on('match.removed', _routeChatEvent)
-      ..on('chat.typing', _routeTyping);
+      ..on('chat.typing', _routeTyping)
+      ..on('call.incoming', _routeCallEvent)
+      ..on('call.accepted', _routeCallEvent)
+      ..on('call.rejected', _routeCallEvent)
+      ..on('call.cancelled', _routeCallEvent)
+      ..on('call.ended', _routeCallEvent)
+      ..on('call.snapshot', _routeCallSnapshot);
 
     _socket = socket;
     socket.connect();
@@ -91,6 +125,8 @@ class ChatSocketService {
     _socket?.dispose();
     _socket = null;
     await _typingCtl.close();
+    await _callCtl.close();
+    await _callSnapshotCtl.close();
   }
 
   /// Send a typing.start / typing.stop notification to the other party.
@@ -112,6 +148,19 @@ class ChatSocketService {
     final map = Map<String, dynamic>.from(raw);
     // Fire-and-forget — the apply function handles its own errors.
     unawaited(syncService.applyRealtimeEvent(map));
+  }
+
+  void _routeCallEvent(dynamic raw) {
+    if (raw is! Map) return;
+    final envelope = Map<String, dynamic>.from(raw);
+    final event = parseCallEvent(envelope);
+    if (event != null) _callCtl.add(event);
+  }
+
+  void _routeCallSnapshot(dynamic raw) {
+    if (raw is! Map) return;
+    final event = CallSnapshotEvent.fromJson(Map<String, dynamic>.from(raw));
+    _callSnapshotCtl.add(event);
   }
 
   void _routeTyping(dynamic raw) {

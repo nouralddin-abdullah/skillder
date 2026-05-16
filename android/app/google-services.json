@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "457806273960",
+    "project_id": "skillder-2eb1c",
+    "storage_bucket": "skillder-2eb1c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457806273960:android:8ab3697b6b874dd560d19d",
+        "android_client_info": {
+          "package_name": "com.skillder.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDttbPld6Hk6D9fLHAqL6e-ZSwF8silsQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

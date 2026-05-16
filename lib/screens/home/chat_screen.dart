@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/chat_models.dart';
+import '../../services/auth_storage.dart';
 import '../../services/chat_repository.dart';
+import '../../services/chat_socket_service.dart';
 import '../../services/chat_sync_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/chat/safety_bottom_sheet.dart';
@@ -22,8 +24,16 @@ class _ChatScreenState extends State<ChatScreen> {
   String _query = '';
 
   StreamSubscription<List<ChatSummary>>? _chatsSub;
+  StreamSubscription<TypingNotification>? _typingSub;
   ChatRepository? _repo;
   ChatSyncService? _sync;
+  String? _currentUserId;
+
+  /// chatId → true while the OTHER user is typing in that chat. Cleared
+  /// either by an explicit `isTyping: false` event or by the per-chat
+  /// auto-clear timer below (defends against a missed stop event).
+  final Set<String> _typingChats = <String>{};
+  final Map<String, Timer> _typingClearTimers = <String, Timer>{};
 
   /// True for the very first sync of this app session — used to show a
   /// blocking spinner only if the local DB is empty too.
@@ -41,13 +51,20 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _chatsSub?.cancel();
+    _typingSub?.cancel();
+    for (final t in _typingClearTimers.values) {
+      t.cancel();
+    }
+    _typingClearTimers.clear();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
+    _currentUserId = await AuthStorage.getUserId();
     final repo = await ChatRepositoryHolder.instance();
     final sync = await ChatSyncServiceHolder.instance();
+    final socket = await ChatSocketServiceHolder.instance();
     if (!mounted) return;
     setState(() {
       _repo = repo;
@@ -59,7 +76,29 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _chats = chats);
     });
 
+    _typingSub = socket.typingStream.listen(_onTypingNotification);
+
     await _runSync();
+  }
+
+  void _onTypingNotification(TypingNotification n) {
+    // Defensive — backend only emits typing to the OTHER user, so our own
+    // userId should never appear here. Filter anyway.
+    if (n.userId == _currentUserId) return;
+    if (!mounted) return;
+
+    if (n.isTyping) {
+      _typingClearTimers[n.chatId]?.cancel();
+      _typingClearTimers[n.chatId] = Timer(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        setState(() => _typingChats.remove(n.chatId));
+        _typingClearTimers.remove(n.chatId);
+      });
+      if (_typingChats.add(n.chatId)) setState(() {});
+    } else {
+      _typingClearTimers.remove(n.chatId)?.cancel();
+      if (_typingChats.remove(n.chatId)) setState(() {});
+    }
   }
 
   /// Default refresh — what we run on mount and after returning from a chat
@@ -324,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
             for (int i = 0; i < convos.length; i++) ...[
               _ConversationTile(
                 chat: convos[i],
+                isTyping: _typingChats.contains(convos[i].chatId),
                 onTap: () => _openChat(convos[i]),
               ),
               if (i < convos.length - 1)
@@ -411,9 +451,14 @@ Widget _avatarFallback() => Container(
 // ── Conversation tile ──
 class _ConversationTile extends StatelessWidget {
   final ChatSummary chat;
+  final bool isTyping;
   final VoidCallback onTap;
 
-  const _ConversationTile({required this.chat, required this.onTap});
+  const _ConversationTile({
+    required this.chat,
+    required this.onTap,
+    this.isTyping = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -464,19 +509,31 @@ class _ConversationTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    preview,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight:
-                          isUnread ? FontWeight.w500 : FontWeight.w400,
-                      color: isUnread
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
-                    ),
-                  ),
+                  isTyping
+                      ? Text(
+                          'typing…',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      : Text(
+                          preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight:
+                                isUnread ? FontWeight.w500 : FontWeight.w400,
+                            color: isUnread
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
                 ],
               ),
             ),

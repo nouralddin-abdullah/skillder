@@ -21,6 +21,14 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // Google Services plugin reads android/app/google-services.json and exposes
+    // its values to the Firebase SDKs at build time. Required for FCM (push
+    // notifications used by the calls feature).
+    id("com.google.gms.google-services") version "4.4.4" apply false
+    // Lets Gradle auto-discover / download the right JDK when a plugin
+    // declares a strict `toolchain { languageVersion.set(...) }`. Required
+    // by flutter_callkit_incoming which pins JDK 17.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
 include(":app")

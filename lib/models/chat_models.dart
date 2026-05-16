@@ -70,6 +70,13 @@ class MessageEntity {
   /// once and keeps it efficiently without us holding the bytes in RAM.
   final String? localImagePath;
 
+  /// Server-provided structured payload for `kind == system` messages.
+  /// Currently used for call records (`{kind:'call', callKind, durationSeconds,
+  /// endReason, callerId, calleeId, callId}`); stays null for everything
+  /// else. UI prefers this over [body] when present so it can render
+  /// localized + tappable widgets.
+  final Map<String, dynamic>? systemPayload;
+
   const MessageEntity({
     required this.clientId,
     required this.chatId,
@@ -90,6 +97,7 @@ class MessageEntity {
     this.deletedAt,
     this.localImageBytes,
     this.localImagePath,
+    this.systemPayload,
   });
 
   bool get isSystem => kind == MessageKind.system;
@@ -121,6 +129,9 @@ class MessageEntity {
       deletedAt: _parseDate(json['deletedAt']),
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now().toUtc(),
       status: MessageStatus.sent,
+      systemPayload: json['systemPayload'] is Map
+          ? Map<String, dynamic>.from(json['systemPayload'] as Map)
+          : null,
     );
   }
 
@@ -139,6 +150,7 @@ class MessageEntity {
     MessageStatus? status,
     Uint8List? localImageBytes,
     String? localImagePath,
+    Map<String, dynamic>? systemPayload,
     bool clearLocalImageBytes = false,
   }) {
     return MessageEntity(
@@ -164,6 +176,7 @@ class MessageEntity {
           ? null
           : (localImageBytes ?? this.localImageBytes),
       localImagePath: localImagePath ?? this.localImagePath,
+      systemPayload: systemPayload ?? this.systemPayload,
     );
   }
 }
@@ -227,11 +240,21 @@ class ChatSummary {
     this.otherUserLastReadAt,
   });
 
-  /// True when this chat has no real conversation yet — only the system
-  /// "You matched" message (or no message at all). Used by the chat list to
-  /// show the avatar in the "New Matches" carousel.
-  bool get isNewMatch =>
-      lastMessage == null || lastMessage!.kind == MessageKind.system;
+  /// True when this chat has no real conversation yet — only the original
+  /// "You matched" system message (or no message at all). Used by the chat
+  /// list to show the avatar in the "New Matches" carousel.
+  ///
+  /// Call records are also system-kind messages but they represent real
+  /// activity, so we use `systemPayload.kind == 'call'` to keep them out
+  /// of the new-matches bucket. Backend always emits the structured
+  /// payload alongside the human-readable body, so this single check is
+  /// sufficient.
+  bool get isNewMatch {
+    final last = lastMessage;
+    if (last == null) return true;
+    if (last.kind != MessageKind.system) return false;
+    return last.systemPayload?['kind'] != 'call';
+  }
 
   bool get isUnread => unreadCount > 0;
 

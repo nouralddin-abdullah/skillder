@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 
 import '../db/app_database.dart';
@@ -290,6 +292,18 @@ class ChatRepository {
       _db.setOtherUserLastReadAt(chatId: chatId, at: at);
 
   MessageEntity _messageRowToEntity(Message row) {
+    Map<String, dynamic>? systemPayload;
+    final raw = row.systemPayload;
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          systemPayload = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {
+        // Malformed JSON — keep null and fall back to body text.
+      }
+    }
     return MessageEntity(
       id: row.id,
       clientId: row.clientId,
@@ -308,6 +322,7 @@ class ChatRepository {
       deletedAt: row.deletedAt,
       createdAt: row.createdAt,
       status: _statusFromString(row.status),
+      systemPayload: systemPayload,
     );
   }
 
@@ -333,6 +348,8 @@ class ChatRepository {
       deletedAt: Value(m.deletedAt),
       createdAt: Value(m.createdAt),
       status: Value(_statusToString(m.status)),
+      systemPayload:
+          Value(m.systemPayload != null ? jsonEncode(m.systemPayload) : null),
     );
   }
 

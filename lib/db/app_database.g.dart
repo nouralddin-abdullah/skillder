@@ -981,6 +981,17 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     requiredDuringInsert: false,
     defaultValue: const Constant('sent'),
   );
+  static const VerificationMeta _systemPayloadMeta = const VerificationMeta(
+    'systemPayload',
+  );
+  @override
+  late final GeneratedColumn<String> systemPayload = GeneratedColumn<String>(
+    'system_payload',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     rowId,
@@ -1001,6 +1012,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     deletedAt,
     createdAt,
     status,
+    systemPayload,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1139,6 +1151,15 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         status.isAcceptableOrUnknown(data['status']!, _statusMeta),
       );
     }
+    if (data.containsKey('system_payload')) {
+      context.handle(
+        _systemPayloadMeta,
+        systemPayload.isAcceptableOrUnknown(
+          data['system_payload']!,
+          _systemPayloadMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1220,6 +1241,10 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       )!,
+      systemPayload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}system_payload'],
+      ),
     );
   }
 
@@ -1259,6 +1284,12 @@ class Message extends DataClass implements Insertable<Message> {
 
   /// 'sending' | 'sent' | 'failed' — local UI lifecycle.
   final String status;
+
+  /// JSON-encoded `system_payload` from the backend (only set on system-kind
+  /// messages — call records, future system events). Stored as TEXT because
+  /// SQLite has no native JSONB type; consumers parse on read. Body remains
+  /// the human-readable fallback for old rows + downlevel renderers.
+  final String? systemPayload;
   const Message({
     required this.rowId,
     this.id,
@@ -1278,6 +1309,7 @@ class Message extends DataClass implements Insertable<Message> {
     this.deletedAt,
     required this.createdAt,
     required this.status,
+    this.systemPayload,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1324,6 +1356,9 @@ class Message extends DataClass implements Insertable<Message> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['status'] = Variable<String>(status);
+    if (!nullToAbsent || systemPayload != null) {
+      map['system_payload'] = Variable<String>(systemPayload);
+    }
     return map;
   }
 
@@ -1367,6 +1402,9 @@ class Message extends DataClass implements Insertable<Message> {
           : Value(deletedAt),
       createdAt: Value(createdAt),
       status: Value(status),
+      systemPayload: systemPayload == null && nullToAbsent
+          ? const Value.absent()
+          : Value(systemPayload),
     );
   }
 
@@ -1398,6 +1436,7 @@ class Message extends DataClass implements Insertable<Message> {
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       status: serializer.fromJson<String>(json['status']),
+      systemPayload: serializer.fromJson<String?>(json['systemPayload']),
     );
   }
   @override
@@ -1422,6 +1461,7 @@ class Message extends DataClass implements Insertable<Message> {
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'status': serializer.toJson<String>(status),
+      'systemPayload': serializer.toJson<String?>(systemPayload),
     };
   }
 
@@ -1444,6 +1484,7 @@ class Message extends DataClass implements Insertable<Message> {
     Value<DateTime?> deletedAt = const Value.absent(),
     DateTime? createdAt,
     String? status,
+    Value<String?> systemPayload = const Value.absent(),
   }) => Message(
     rowId: rowId ?? this.rowId,
     id: id.present ? id.value : this.id,
@@ -1467,6 +1508,9 @@ class Message extends DataClass implements Insertable<Message> {
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     createdAt: createdAt ?? this.createdAt,
     status: status ?? this.status,
+    systemPayload: systemPayload.present
+        ? systemPayload.value
+        : this.systemPayload,
   );
   Message copyWithCompanion(MessagesCompanion data) {
     return Message(
@@ -1498,6 +1542,9 @@ class Message extends DataClass implements Insertable<Message> {
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       status: data.status.present ? data.status.value : this.status,
+      systemPayload: data.systemPayload.present
+          ? data.systemPayload.value
+          : this.systemPayload,
     );
   }
 
@@ -1521,7 +1568,8 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('createdAt: $createdAt, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('systemPayload: $systemPayload')
           ..write(')'))
         .toString();
   }
@@ -1546,6 +1594,7 @@ class Message extends DataClass implements Insertable<Message> {
     deletedAt,
     createdAt,
     status,
+    systemPayload,
   );
   @override
   bool operator ==(Object other) =>
@@ -1568,7 +1617,8 @@ class Message extends DataClass implements Insertable<Message> {
           other.editedAt == this.editedAt &&
           other.deletedAt == this.deletedAt &&
           other.createdAt == this.createdAt &&
-          other.status == this.status);
+          other.status == this.status &&
+          other.systemPayload == this.systemPayload);
 }
 
 class MessagesCompanion extends UpdateCompanion<Message> {
@@ -1590,6 +1640,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<DateTime?> deletedAt;
   final Value<DateTime> createdAt;
   final Value<String> status;
+  final Value<String?> systemPayload;
   const MessagesCompanion({
     this.rowId = const Value.absent(),
     this.id = const Value.absent(),
@@ -1609,6 +1660,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.deletedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.status = const Value.absent(),
+    this.systemPayload = const Value.absent(),
   });
   MessagesCompanion.insert({
     this.rowId = const Value.absent(),
@@ -1629,6 +1681,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     this.deletedAt = const Value.absent(),
     required DateTime createdAt,
     this.status = const Value.absent(),
+    this.systemPayload = const Value.absent(),
   }) : clientId = Value(clientId),
        chatId = Value(chatId),
        kind = Value(kind),
@@ -1652,6 +1705,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<DateTime>? deletedAt,
     Expression<DateTime>? createdAt,
     Expression<String>? status,
+    Expression<String>? systemPayload,
   }) {
     return RawValuesInsertable({
       if (rowId != null) 'row_id': rowId,
@@ -1673,6 +1727,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (status != null) 'status': status,
+      if (systemPayload != null) 'system_payload': systemPayload,
     });
   }
 
@@ -1695,6 +1750,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Value<DateTime?>? deletedAt,
     Value<DateTime>? createdAt,
     Value<String>? status,
+    Value<String?>? systemPayload,
   }) {
     return MessagesCompanion(
       rowId: rowId ?? this.rowId,
@@ -1715,6 +1771,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
+      systemPayload: systemPayload ?? this.systemPayload,
     );
   }
 
@@ -1775,6 +1832,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (systemPayload.present) {
+      map['system_payload'] = Variable<String>(systemPayload.value);
+    }
     return map;
   }
 
@@ -1798,7 +1858,8 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('createdAt: $createdAt, ')
-          ..write('status: $status')
+          ..write('status: $status, ')
+          ..write('systemPayload: $systemPayload')
           ..write(')'))
         .toString();
   }
@@ -3684,6 +3745,7 @@ typedef $$MessagesTableCreateCompanionBuilder =
       Value<DateTime?> deletedAt,
       required DateTime createdAt,
       Value<String> status,
+      Value<String?> systemPayload,
     });
 typedef $$MessagesTableUpdateCompanionBuilder =
     MessagesCompanion Function({
@@ -3705,6 +3767,7 @@ typedef $$MessagesTableUpdateCompanionBuilder =
       Value<DateTime?> deletedAt,
       Value<DateTime> createdAt,
       Value<String> status,
+      Value<String?> systemPayload,
     });
 
 class $$MessagesTableFilterComposer
@@ -3803,6 +3866,11 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<String> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get systemPayload => $composableBuilder(
+    column: $table.systemPayload,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3905,6 +3973,11 @@ class $$MessagesTableOrderingComposer
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get systemPayload => $composableBuilder(
+    column: $table.systemPayload,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MessagesTableAnnotationComposer
@@ -3979,6 +4052,11 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get systemPayload => $composableBuilder(
+    column: $table.systemPayload,
+    builder: (column) => column,
+  );
 }
 
 class $$MessagesTableTableManager
@@ -4027,6 +4105,7 @@ class $$MessagesTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String> status = const Value.absent(),
+                Value<String?> systemPayload = const Value.absent(),
               }) => MessagesCompanion(
                 rowId: rowId,
                 id: id,
@@ -4046,6 +4125,7 @@ class $$MessagesTableTableManager
                 deletedAt: deletedAt,
                 createdAt: createdAt,
                 status: status,
+                systemPayload: systemPayload,
               ),
           createCompanionCallback:
               ({
@@ -4067,6 +4147,7 @@ class $$MessagesTableTableManager
                 Value<DateTime?> deletedAt = const Value.absent(),
                 required DateTime createdAt,
                 Value<String> status = const Value.absent(),
+                Value<String?> systemPayload = const Value.absent(),
               }) => MessagesCompanion.insert(
                 rowId: rowId,
                 id: id,
@@ -4086,6 +4167,7 @@ class $$MessagesTableTableManager
                 deletedAt: deletedAt,
                 createdAt: createdAt,
                 status: status,
+                systemPayload: systemPayload,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

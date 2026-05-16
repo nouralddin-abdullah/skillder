@@ -8,8 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../features/calls/controllers/active_call_controller.dart';
+import '../../features/calls/models/call_models.dart';
+import '../../features/calls/services/call_permissions.dart';
+import '../../features/calls/services/call_service.dart';
+import '../../features/calls/ui/call_history_tile.dart';
 import '../../models/chat_models.dart';
 import '../../models/dummy_user.dart';
+import '../../services/api_exception.dart';
 import '../../services/auth_storage.dart';
 import '../../services/chat_outbox_service.dart';
 import '../../services/chat_repository.dart';
@@ -87,6 +93,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   /// The id of the latest non-mine message we've POSTed `/read` for.
   String? _lastReadServerId;
+
+  /// True while a `POST /api/calls` attempt (and its internal retries) is in
+  /// flight. Drives the call button's visual disabled state and short-circuits
+  /// duplicate taps before they reach the controller. The controller's own
+  /// `_initiateInFlight` guard is the source of truth across screens; this
+  /// is a per-screen mirror so the button can dim during the handshake.
+  bool _isCallStarting = false;
 
   @override
   void initState() {
@@ -646,6 +659,77 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  /// Initiate an outbound call. Opens the controller's outgoing call screen
+  /// via [CallOverlayHost] which is layered above this route.
+  ///
+  /// Guarded against rapid double-taps by [_isCallStarting]: while the
+  /// handshake is in flight (including the controller's internal stale-ring
+  /// retry), additional taps are silently ignored at this layer AND at the
+  /// controller layer. This is the load-bearing fix for the observed
+  /// 8-retries-in-2.4s storm — the underlying `POST /api/calls` is also
+  /// idempotency-keyed so even if a guard slip happened, the backend would
+  /// replay the cached response instead of opening a parallel call.
+  Future<void> _startCall(CallKind kind) async {
+    if (_isCallStarting) return;
+    if (_chat.removedByMe) {
+      _showError("You've removed this chat");
+      return;
+    }
+    final controller = await ActiveCallControllerHolder.instance();
+    if (!mounted) return;
+    if (controller.hasActiveCall) {
+      _showError("You're already in a call");
+      return;
+    }
+    setState(() => _isCallStarting = true);
+    try {
+      await controller.initiate(
+        chatId: _chat.chatId,
+        peerUserId: _chat.otherUser.id,
+        peerName: _chat.otherUser.name,
+        peerPhotoUrl: _chat.otherUser.photoUrl,
+        kind: kind,
+      );
+    } on CallPermissionDeniedException catch (e) {
+      if (!mounted) return;
+      _showError(e.userMessage);
+    } on CallBusyException catch (e) {
+      if (!mounted) return;
+      _showError(_busyMessageFor(e));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Could not start call');
+    } finally {
+      if (mounted) {
+        setState(() => _isCallStarting = false);
+      }
+    }
+  }
+
+  /// Turn a 409 into a user-readable line, using the structured `existing`
+  /// payload when the post-fix backend provided it (contract §1, 409 shape).
+  String _busyMessageFor(CallBusyException e) {
+    final existing = e.existing;
+    final peerName = existing?.peerName;
+    switch (e.code) {
+      case 'callee_busy':
+        return '${peerName ?? _chat.otherUser.name} is in another call';
+      case 'caller_busy':
+        if (existing == null) return "You're already in a call";
+        // role='caller' = user is ringing someone else; role='callee' = user
+        // is being rung. Either way, "you" is the right subject.
+        if (existing.peerName != null && existing.peerName!.isNotEmpty) {
+          return "You're already in a call with ${existing.peerName}";
+        }
+        return "You're already in a call";
+      default:
+        return "You're already in a call";
+    }
+  }
+
   void _openSafetyToolkit() {
     showModalBottomSheet(
       context: context,
@@ -1035,9 +1119,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 _chat.otherUser.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w700,
@@ -1047,6 +1134,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               if (_otherIsTyping)
                                 Text(
                                   'typing…',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -1060,12 +1149,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: _openSafetyToolkit,
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    color: AppColors.textPrimary,
-                    size: 26,
+                // Split call button: tap the phone icon to start a voice
+                // call by default; tap the small ▾ to choose voice or
+                // video. Mirrors WhatsApp's compact header so we don't
+                // eat horizontal space on long names.
+                _CallSplitButton(
+                  onVoice: () => _startCall(CallKind.voice),
+                  onVideo: () => _startCall(CallKind.video),
+                  enabled: !_isCallStarting,
+                ),
+                // 3-dot — bare GestureDetector with minimal padding so it
+                // sits right next to the call button.
+                GestureDetector(
+                  onTap: _openSafetyToolkit,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.fromLTRB(6, 12, 12, 12),
+                    child: Icon(
+                      Icons.more_horiz_rounded,
+                      color: AppColors.textPrimary,
+                      size: 22,
+                    ),
                   ),
                 ),
               ],
@@ -1182,7 +1286,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
                 ),
-              _MessageBubble(
+              if (message.isSystem)
+                CallHistoryTile(
+                  message: message,
+                  mine: mine,
+                  onCallBack: (kind) => _startCall(kind),
+                )
+              else
+                _MessageBubble(
                 message: message,
                 isMine: mine,
                 contactName: _chat.otherUser.name,
@@ -1210,8 +1321,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   bool _isVisible(MessageEntity m) {
-    if (m.isSystem) return false;
     if (m.isDeleted) return false;
+    if (m.isSystem) {
+      // Call records are rendered inline; other system events (e.g. the
+      // "you matched" message) are surfaced via _MatchHeader so we hide
+      // them here to avoid duplication.
+      return CallHistoryTile.isCallRecord(m);
+    }
     return true;
   }
 
@@ -2214,6 +2330,138 @@ String _formatVideoDuration(int seconds) {
   String two(int v) => v.toString().padLeft(2, '0');
   if (h > 0) return '${two(h)}:${two(m)}:${two(s)}';
   return '$m:${two(s)}';
+}
+
+/// Compact split button for the chat header: phone-call icon on the left,
+/// small dropdown caret hugging it on the right. Tapping the phone starts a
+/// voice call; tapping the caret opens a popup menu with Voice / Video.
+///
+/// Both halves are wrapped in tight zero-padding containers so they read
+/// as one unified pill instead of two free-floating IconButtons. We avoid
+/// the default Material IconButton because it forces a 48x48 hit-target
+/// with 8px padding, which scatters the two halves apart.
+class _CallSplitButton extends StatefulWidget {
+  final VoidCallback onVoice;
+  final VoidCallback onVideo;
+
+  /// When false the button is dimmed and taps are absorbed without firing
+  /// the handlers. Drives the visual state during the call-initiate
+  /// handshake so the user gets feedback that the first tap is being
+  /// processed and doesn't fan out parallel attempts.
+  final bool enabled;
+  const _CallSplitButton({
+    required this.onVoice,
+    required this.onVideo,
+    this.enabled = true,
+  });
+
+  @override
+  State<_CallSplitButton> createState() => _CallSplitButtonState();
+}
+
+class _CallSplitButtonState extends State<_CallSplitButton> {
+  final GlobalKey _caretKey = GlobalKey();
+
+  Future<void> _openMenu() async {
+    if (!widget.enabled) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final caretBox =
+        _caretKey.currentContext?.findRenderObject() as RenderBox?;
+    if (overlay == null || caretBox == null) return;
+    final caretTopLeft =
+        caretBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final caretBottomRight = caretBox.localToGlobal(
+      caretBox.size.bottomRight(Offset.zero),
+      ancestor: overlay,
+    );
+    final position = RelativeRect.fromLTRB(
+      caretTopLeft.dx,
+      caretBottomRight.dy + 4,
+      overlay.size.width - caretBottomRight.dx,
+      0,
+    );
+    final selected = await showMenu<CallKind>(
+      context: context,
+      position: position,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      items: [
+        PopupMenuItem(
+          value: CallKind.voice,
+          child: Row(
+            children: [
+              const Icon(Icons.call_outlined,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Text('Voice call', style: GoogleFonts.inter(fontSize: 14)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: CallKind.video,
+          child: Row(
+            children: [
+              const Icon(Icons.videocam_outlined,
+                  size: 20, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Text('Video call', style: GoogleFonts.inter(fontSize: 14)),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (selected == CallKind.video) {
+      widget.onVideo();
+    } else if (selected == CallKind.voice) {
+      widget.onVoice();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // When disabled, dim the icons AND swallow taps. Returning null from
+    // onTap is what actually short-circuits the tap; the opacity is the
+    // user-visible signal. We don't use IgnorePointer because we still want
+    // hit-testing for the disabled period (otherwise rapid taps could
+    // "tunnel" to widgets behind the button while the handshake is running).
+    final iconColor =
+        widget.enabled ? AppColors.primary : AppColors.primary.withValues(alpha: 0.35);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Phone — bare GestureDetector with explicit padding for the
+        // touch target. Zero right padding so the caret sits flush.
+        GestureDetector(
+          onTap: widget.enabled ? widget.onVoice : null,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 12, 0, 12),
+            child: Icon(
+              Icons.call_outlined,
+              color: iconColor,
+              size: 22,
+            ),
+          ),
+        ),
+        // Caret — zero left padding, touches the phone.
+        GestureDetector(
+          key: _caretKey,
+          onTap: widget.enabled ? _openMenu : null,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 12, 4, 12),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: iconColor,
+              size: 16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _AvatarPlaceholder extends StatelessWidget {

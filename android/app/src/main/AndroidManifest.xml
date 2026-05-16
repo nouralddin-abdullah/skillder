@@ -1,5 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- ── Voice/video calls ── -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <!-- Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Android 14+ for ringing over the lock screen -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <!-- Foreground service runs while a call is active so audio survives screen lock -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <!-- Android 14+ requires the matching permission for each foreground
+         service type. Our CallAudioForegroundService runs with type
+         phoneCall|microphone so the OS doesn't suspend mic access mid-call. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <!-- Wake the screen when an incoming call arrives on a locked device -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
     <application
         android:label="skillder"
         android:name="${applicationName}"
@@ -33,6 +56,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Foreground service whose entire job is to keep the call's mic
+             alive in background. Started from Flutter via a method channel
+             when the call goes active; stopped when the call ends. The
+             phoneCall|microphone types are what tell Android 13+ this is
+             a legitimate VoIP service and not to suspend mic capture. -->
+        <service
+            android:name=".CallAudioForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|microphone" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

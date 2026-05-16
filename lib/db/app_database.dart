@@ -72,6 +72,12 @@ class Messages extends Table {
 
   /// 'sending' | 'sent' | 'failed' — local UI lifecycle.
   TextColumn get status => text().withDefault(const Constant('sent'))();
+
+  /// JSON-encoded `system_payload` from the backend (only set on system-kind
+  /// messages — call records, future system events). Stored as TEXT because
+  /// SQLite has no native JSONB type; consumers parse on read. Body remains
+  /// the human-readable fallback for old rows + downlevel renderers.
+  TextColumn get systemPayload => text().nullable()();
 }
 
 /// Singleton-ish key/value store for the delta-sync cursor and last-sync
@@ -126,7 +132,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -150,6 +156,14 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(outboxRows, outboxRows.mediaWidth);
             await m.addColumn(outboxRows, outboxRows.mediaHeight);
             await m.addColumn(outboxRows, outboxRows.mediaDurationSeconds);
+          }
+          if (from < 4) {
+            // Calls feature: structured payload for system-kind messages
+            // (currently call records: kind/duration/endReason/etc.).
+            // Existing system messages stay null and continue to render
+            // from `body` — the backend always writes both, so future
+            // syncs will populate this column.
+            await m.addColumn(messages, messages.systemPayload);
           }
         },
       );

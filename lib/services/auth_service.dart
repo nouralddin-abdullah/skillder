@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../features/calls/services/call_fcm_handler.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
 import 'auth_storage.dart';
@@ -51,6 +52,7 @@ class AuthService {
     final userId = data['userId'] as String;
 
     await AuthStorage.saveSession(token: token, userId: userId);
+    await CallFcmHandler.setUpForUser();
     return userId;
   }
 
@@ -91,6 +93,7 @@ class AuthService {
     final data = body['data'] as Map<String, dynamic>;
     final token = data['accessToken'] as String;
     await AuthStorage.saveSession(token: token, userId: '');
+    await CallFcmHandler.setUpForUser();
   }
 
   /// Sends a Google ID token to the backend for verification. Backend looks
@@ -118,6 +121,7 @@ class AuthService {
     final userId = (data['userId'] as String?) ?? '';
     final isNewUser = data['isNewUser'] == true;
     await AuthStorage.saveSession(token: token, userId: userId);
+    await CallFcmHandler.setUpForUser();
     return isNewUser;
   }
 }
